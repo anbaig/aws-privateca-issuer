@@ -68,7 +68,7 @@ jobs:
             });
 
             core.info('Commit: ' + context.sha);
-            core.info('Commits: ' + commits);
+            core.info('Commits: ' + commits.data);
 
             if (commits.data.length > 0) {
               const labels = commits.data[0].labels.map(label => label.name);
