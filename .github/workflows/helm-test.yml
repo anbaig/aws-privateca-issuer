@@ -5,6 +5,7 @@ on:
     branches: [ main, helm-testing-implementation ]
   pull_request:
     branches: [ main, helm-testing-implementation ]
+  workflow_call:
 
 jobs:
   helm-e2e-tests:
