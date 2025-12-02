@@ -173,8 +173,27 @@ jobs:
           echo "Done"
     # uses: './.github/workflows/helm-test.yml'
 
-  build-public:
-    name: release
+  update-chart:
+    needs: [run-for-arm, run-for-x86, run-helm-tests, get-versions]
+    if: ${{ needs.run-for-arm.result == 'success' && needs.run-for-x86.result == 'success' && needs.run-helm-tests.result == 'success' && needs.get-versions.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Modify chart
+        run: |
+          NEW_VERSION="${{ needs.get-versions.outputs.new_version }}"
+          sed -i "s/^version: .*/version: ${NEW_VERSION}/" Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: ${NEW_VERSION}/" Chart.yaml
+      - name: Push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .
+          git commit -m "Update chart version to ${{ needs.get-versions.outputs.new_version }}" --signoff
+          git push
+
+  build-public-ecr:
     needs: [run-for-arm, run-for-x86, run-helm-tests, get-versions]
     if: ${{ needs.run-for-arm.result == 'success' && needs.run-for-x86.result == 'success' && needs.run-helm-tests.result == 'success' && needs.get-versions.result == 'success' }}
     runs-on: ubuntu-latest
