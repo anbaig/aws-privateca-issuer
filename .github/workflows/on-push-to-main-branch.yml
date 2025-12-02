@@ -183,8 +183,8 @@ jobs:
       - name: Modify chart
         run: |
           NEW_VERSION="${{ needs.get-versions.outputs.new_version }}"
-          sed -i "s/^version: .*/version: ${NEW_VERSION}/" Chart.yaml
-          sed -i "s/^appVersion: .*/appVersion: ${NEW_VERSION}/" Chart.yaml
+          sed -i "s/^version: .*/version: ${NEW_VERSION}/" charts/aws-pca-issuer/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: ${NEW_VERSION}/" charts/aws-pca-issuer/Chart.yaml
       - name: Push changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -232,3 +232,23 @@ jobs:
             ${{ env.TAG_BASE }}:latest
             ${{ env.TAG_BASE }}:${{ needs.get-versions.outputs.new_version }}
           push: true
+
+  publish-helm-chart:
+    needs: [build-public-ecr]
+    if: ${{ needs.build-public-ecr.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish Helm chart
+        run: |
+          echo "Done"
+
+  test-new-helm-chart:
+    needs: [publish-helm-chart]
+    if: ${{ needs.publish-helm-chart.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run
+        run: |
+          echo "Done"
+    # uses: './.github/workflows/helm-test.yml'
+        
