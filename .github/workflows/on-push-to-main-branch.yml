@@ -51,7 +51,7 @@ jobs:
   version-bump:
     runs-on: ubuntu-latest
     outputs:
-      bump_type: steps.pr_labels.outputs.bump_type
+      bump_type: ${{ steps.pr_labels.outputs.bump_type }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
