@@ -20,7 +20,6 @@ import (
 
 const (
 	chartPath     = "../../charts/aws-pca-issuer"
-	testNamespace = "aws-pca-issuer-test"
 	releasePrefix = "test-release"
 )
 
@@ -48,7 +47,8 @@ func setupTest(t *testing.T) *testHelper {
 	
 	t.Logf("Successfully created Kubernetes clientset")
 
-	// Create test namespace
+	// Create unique namespace for each test to avoid race conditions
+	testNamespace := fmt.Sprintf("aws-pca-issuer-test-%d", time.Now().UnixNano())
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testNamespace,
