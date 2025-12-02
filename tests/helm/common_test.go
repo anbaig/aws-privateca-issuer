@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -33,20 +34,20 @@ func setupTest(t *testing.T) *testHelper {
 	// Use existing cluster setup from make target
 	kubeconfig := "/tmp/pca_kubeconfig"
 	t.Logf("Attempting to use kubeconfig: %s", kubeconfig)
-	
+
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		t.Logf("Failed to load kubeconfig: %v", err)
 		t.Skipf("Skipping e2e test - no Kubernetes cluster available: %v", err)
 	}
-	
+
 	t.Logf("Successfully loaded kubeconfig, server: %s", config.Host)
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if !assert.NoError(t, err, "Failed to create Kubernetes clientset") {
 		t.Skip("Cannot create Kubernetes clientset")
 	}
-	
+
 	t.Logf("Successfully created Kubernetes clientset")
 
 	// Create unique namespace for each test to avoid race conditions
@@ -74,7 +75,7 @@ func setupTest(t *testing.T) *testHelper {
 func (h *testHelper) cleanup() {
 	// Clean up cluster-scoped resources first (they don't get deleted with namespace)
 	h.cleanupClusterResources()
-	
+
 	// Then delete the namespace
 	err := h.clientset.CoreV1().Namespaces().Delete(context.TODO(), h.namespace, metav1.DeleteOptions{})
 	if err != nil && !strings.Contains(err.Error(), "not found") {
@@ -132,7 +133,7 @@ func (h *testHelper) cleanupClusterResourcesForRelease(releaseName string) {
 
 func (h *testHelper) installChart(values map[string]interface{}) *release.Release {
 	h.t.Logf("Starting chart installation with values: %+v", values)
-	
+
 	settings := cli.New()
 	settings.KubeConfig = "/tmp/pca_kubeconfig" // Use the same kubeconfig as manual install
 	actionConfig := new(action.Configuration)
@@ -163,27 +164,39 @@ func (h *testHelper) installChart(values map[string]interface{}) *release.Releas
 	}
 	h.t.Logf("Chart loaded successfully: %s-%s", chart.Name(), chart.Metadata.Version)
 
-	// Override image for testing to use a simple image that works
+	// Set default values for testing if not provided
 	if values == nil {
 		values = make(map[string]interface{})
 	}
-	values["image"] = map[string]interface{}{
-		"repository": "nginx",
-		"tag":        "alpine",
-		"pullPolicy": "IfNotPresent",
+
+	// Only set default image if not already specified in test values
+	if _, exists := values["image"]; !exists {
+		values["image"] = map[string]interface{}{
+			"repository": "public.ecr.aws/k1n1h4h4/cert-manager-aws-privateca-issuer",
+			"tag":        "v1.2.7",
+			"pullPolicy": "IfNotPresent",
+		}
 	}
-	// Disable health checks that expect the real application
-	values["livenessProbe"] = map[string]interface{}{
-		"enabled": false,
+
+	// Only set default probe settings if not already specified
+	if _, exists := values["livenessProbe"]; !exists {
+		values["livenessProbe"] = map[string]interface{}{
+			"enabled": false,
+		}
 	}
-	values["readinessProbe"] = map[string]interface{}{
-		"enabled": false,
+	if _, exists := values["readinessProbe"]; !exists {
+		values["readinessProbe"] = map[string]interface{}{
+			"enabled": false,
+		}
 	}
-	// Disable approver role to avoid cluster-scoped resource conflicts
-	values["approverRole"] = map[string]interface{}{
-		"enabled": false,
+
+	// Only set default approver role if not already specified
+	if _, exists := values["approverRole"]; !exists {
+		values["approverRole"] = map[string]interface{}{
+			"enabled": false,
+		}
 	}
-	
+
 	h.t.Logf("Final values for installation: %+v", values)
 
 	h.t.Logf("Installing chart...")
@@ -196,24 +209,24 @@ func (h *testHelper) installChart(values map[string]interface{}) *release.Releas
 	h.t.Logf("Helm release %s installed successfully", release.Name)
 	h.t.Logf("Release manifest length: %d", len(release.Manifest))
 	h.t.Logf("Release info: %+v", release.Info)
-	
+
 	// Show the actual manifest (complete)
 	if len(release.Manifest) > 0 {
 		h.t.Logf("Complete Helm manifest:\n%s", release.Manifest)
 	}
-	
+
 	time.Sleep(2 * time.Second) // Give time for resources to be created
-	
+
 	// List all resources to debug what was actually created
 	pods, _ := h.clientset.CoreV1().Pods(h.namespace).List(context.TODO(), metav1.ListOptions{})
 	h.t.Logf("Pods created: %d", len(pods.Items))
-	
+
 	deployments, _ := h.clientset.AppsV1().Deployments(h.namespace).List(context.TODO(), metav1.ListOptions{})
 	h.t.Logf("Deployments created: %d", len(deployments.Items))
 	for _, dep := range deployments.Items {
 		h.t.Logf("  - Deployment: %s", dep.Name)
 	}
-	
+
 	services, _ := h.clientset.CoreV1().Services(h.namespace).List(context.TODO(), metav1.ListOptions{})
 	h.t.Logf("Services created: %d", len(services.Items))
 	for _, svc := range services.Items {
@@ -256,20 +269,21 @@ func (h *testHelper) waitForDeployment(name string) {
 				h.t.Logf("Available deployments in namespace %s:", h.namespace)
 				for _, dep := range deployments.Items {
 					h.t.Logf("  - %s (Ready: %d/%d)", dep.Name, dep.Status.ReadyReplicas, dep.Status.Replicas)
-					
+
 					// Log deployment conditions if not ready
 					if dep.Status.ReadyReplicas != dep.Status.Replicas {
 						h.t.Logf("    Deployment %s conditions:", dep.Name)
 						for _, cond := range dep.Status.Conditions {
 							h.t.Logf("      %s: %s - %s", cond.Type, cond.Status, cond.Message)
 						}
-						
+
 						// Get pod details for this deployment
 						h.logPodFailures(dep.Name)
 					}
 				}
 			}
-			h.t.Fatalf("Timeout waiting for deployment %s to be created", name)
+			h.t.Errorf("Timeout waiting for deployment %s to be created", name)
+			return
 		default:
 			_, err := h.clientset.AppsV1().Deployments(h.namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			if err == nil {
@@ -293,24 +307,24 @@ func (h *testHelper) logPodFailures(deploymentName string) {
 
 	for _, pod := range pods.Items {
 		h.t.Logf("    Pod %s: Phase=%s", pod.Name, pod.Status.Phase)
-		
+
 		// Log container statuses
 		for _, containerStatus := range pod.Status.ContainerStatuses {
-			h.t.Logf("      Container %s: Ready=%t, RestartCount=%d", 
+			h.t.Logf("      Container %s: Ready=%t, RestartCount=%d",
 				containerStatus.Name, containerStatus.Ready, containerStatus.RestartCount)
-			
+
 			if containerStatus.State.Waiting != nil {
-				h.t.Logf("        Waiting: %s - %s", 
+				h.t.Logf("        Waiting: %s - %s",
 					containerStatus.State.Waiting.Reason, containerStatus.State.Waiting.Message)
 			}
 			if containerStatus.State.Terminated != nil {
-				h.t.Logf("        Terminated: %s - %s (Exit Code: %d)", 
-					containerStatus.State.Terminated.Reason, 
+				h.t.Logf("        Terminated: %s - %s (Exit Code: %d)",
+					containerStatus.State.Terminated.Reason,
 					containerStatus.State.Terminated.Message,
 					containerStatus.State.Terminated.ExitCode)
 			}
 		}
-		
+
 		// Log pod conditions
 		for _, cond := range pod.Status.Conditions {
 			if cond.Status != "True" {
@@ -322,7 +336,7 @@ func (h *testHelper) logPodFailures(deploymentName string) {
 
 func (h *testHelper) printResourcesForDebugging(deploymentName string) {
 	h.t.Logf("=== KUBERNETES RESOURCES VALIDATION ===")
-	
+
 	// Print Deployment details
 	if dep, err := h.clientset.AppsV1().Deployments(h.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{}); err == nil {
 		h.t.Logf("✓ Deployment: %s", dep.Name)
@@ -334,24 +348,24 @@ func (h *testHelper) printResourcesForDebugging(deploymentName string) {
 			h.t.Logf("  Replicas: <nil> (managed by HPA)")
 		}
 	}
-	
+
 	// Print HPA if exists
 	if hpa, err := h.clientset.AutoscalingV2().HorizontalPodAutoscalers(h.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{}); err == nil {
 		h.t.Logf("✓ HPA: %s", hpa.Name)
 		h.t.Logf("  Min/Max Replicas: %d/%d", *hpa.Spec.MinReplicas, hpa.Spec.MaxReplicas)
 	}
-	
+
 	// Print Service
 	if svc, err := h.clientset.CoreV1().Services(h.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{}); err == nil {
 		h.t.Logf("✓ Service: %s", svc.Name)
 		h.t.Logf("  Type: %s, Port: %d", svc.Spec.Type, svc.Spec.Ports[0].Port)
 	}
-	
+
 	// Print ServiceAccount
 	if sa, err := h.clientset.CoreV1().ServiceAccounts(h.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{}); err == nil {
 		h.t.Logf("✓ ServiceAccount: %s", sa.Name)
 	}
-	
+
 	// Print PodDisruptionBudget
 	if pdb, err := h.clientset.PolicyV1().PodDisruptionBudgets(h.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{}); err == nil {
 		h.t.Logf("✓ PodDisruptionBudget: %s", pdb.Name)
@@ -359,7 +373,7 @@ func (h *testHelper) printResourcesForDebugging(deploymentName string) {
 			h.t.Logf("  MaxUnavailable: %s", pdb.Spec.MaxUnavailable.String())
 		}
 	}
-	
+
 	// Print ClusterRole and ClusterRoleBinding
 	if cr, err := h.clientset.RbacV1().ClusterRoles().Get(context.TODO(), deploymentName, metav1.GetOptions{}); err == nil {
 		h.t.Logf("✓ ClusterRole: %s", cr.Name)
@@ -367,6 +381,6 @@ func (h *testHelper) printResourcesForDebugging(deploymentName string) {
 	if crb, err := h.clientset.RbacV1().ClusterRoleBindings().Get(context.TODO(), deploymentName, metav1.GetOptions{}); err == nil {
 		h.t.Logf("✓ ClusterRoleBinding: %s", crb.Name)
 	}
-	
+
 	h.t.Logf("=== END RESOURCES VALIDATION ===")
 }

@@ -324,7 +324,10 @@ cluster: manager create-local-registry kind-cluster deploy-cert-manager install-
 .PHONY: cluster-beta
 cluster-beta: manager kind-cluster deploy-cert-manager install-beta-ecr
 
-e2eHelmTest: manager create-local-registry kind-cluster deploy-cert-manager
+deploy-prometheus-crds:
+	kubectl apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.68.0/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml --kubeconfig=/tmp/pca_kubeconfig
+
+e2eHelmTest: manager create-local-registry kind-cluster deploy-cert-manager deploy-prometheus-crds
 	cd tests/helm && go mod tidy && go test -v ./... -timeout=15m
 
 # ==================================
