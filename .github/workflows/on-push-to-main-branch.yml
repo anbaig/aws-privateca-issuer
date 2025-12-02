@@ -194,5 +194,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: |
             ${{ env.TAG_BASE }}:latest
-            ${{ env.TAG_BASE }}:${{steps.tag.outputs.tag}}
+            ${{ env.TAG_BASE }}:${{ needs.get-versions.outputs.new_version }}
           push: true
