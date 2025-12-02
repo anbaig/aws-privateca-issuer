@@ -1,19 +1,10 @@
 name: Helm Chart End-to-End Tests
 
 on:
-  workflow_call:
   push:
     branches: [ main, helm-testing-implementation ]
-    paths:
-      - 'charts/**'
-      - 'tests/helm/**'
-      - '.github/workflows/helm-test.yml'
   pull_request:
     branches: [ main, helm-testing-implementation ]
-    paths:
-      - 'charts/**'
-      - 'tests/helm/**'
-      - '.github/workflows/helm-test.yml'
 
 jobs:
   helm-e2e-tests:
