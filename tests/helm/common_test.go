@@ -172,6 +172,13 @@ func (h *testHelper) installChart(values map[string]interface{}) *release.Releas
 		"tag":        "alpine",
 		"pullPolicy": "IfNotPresent",
 	}
+	// Disable health checks that expect the real application
+	values["livenessProbe"] = map[string]interface{}{
+		"enabled": false,
+	}
+	values["readinessProbe"] = map[string]interface{}{
+		"enabled": false,
+	}
 	// Disable approver role to avoid cluster-scoped resource conflicts
 	values["approverRole"] = map[string]interface{}{
 		"enabled": false,
