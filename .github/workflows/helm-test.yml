@@ -32,7 +32,14 @@ jobs:
     - name: Set up Docker
       uses: docker/setup-buildx-action@v3
 
-    - name: Run Helm End-to-End Tests with verbose output
-      run: |
-        echo "Running make e2eHelmTest..."
-        make e2eHelmTest -d
+    - name: Build manager binary
+      run: make manager
+
+    - name: Create Kind cluster
+      run: make kind-cluster
+
+    - name: Deploy cert-manager
+      run: make deploy-cert-manager
+
+    - name: Run Helm tests
+      run: cd tests/helm && go mod tidy && go test -v ./... -timeout=15m
