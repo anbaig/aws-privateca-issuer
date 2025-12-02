@@ -234,8 +234,8 @@ jobs:
           push: true
 
   publish-helm-chart:
-    needs: [build-public-ecr]
-    if: ${{ needs.build-public-ecr.result == 'success' }}
+    needs: [build-public-ecr, update-chart]
+    if: ${{ needs.build-public-ecr.result == 'success' && needs.update-chart.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Publish Helm chart
@@ -251,4 +251,17 @@ jobs:
         run: |
           echo "Done"
     # uses: './.github/workflows/helm-test.yml'
-        
+
+  release:
+    needs: [test-new-helm-chart, get-versions]
+    if: ${{ needs.test-new-helm-chart.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.get-versions.outputs.new_version }}
+          name: Release ${{ needs.get-versions.outputs.new_version }}
+          generate_release_notes: true
