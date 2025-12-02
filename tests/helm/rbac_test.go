@@ -31,12 +31,16 @@ func TestRBAC(t *testing.T) {
 			validate: func(t *testing.T, h *testHelper, deploymentName string) {
 				// Verify ClusterRole exists
 				clusterRole, err := h.clientset.RbacV1().ClusterRoles().Get(context.TODO(), deploymentName, metav1.GetOptions{})
-				require.NoError(t, err)
+				if !assert.NoError(t, err, "ClusterRole should exist") {
+					return
+				}
 				assert.NotEmpty(t, clusterRole.Rules)
 
 				// Verify ClusterRoleBinding exists
 				clusterRoleBinding, err := h.clientset.RbacV1().ClusterRoleBindings().Get(context.TODO(), deploymentName, metav1.GetOptions{})
-				require.NoError(t, err)
+				if !assert.NoError(t, err, "ClusterRoleBinding should exist") {
+					return
+				}
 				assert.Equal(t, deploymentName, clusterRoleBinding.RoleRef.Name)
 				assert.Len(t, clusterRoleBinding.Subjects, 1)
 				assert.Equal(t, deploymentName, clusterRoleBinding.Subjects[0].Name)
@@ -70,7 +74,9 @@ func TestRBAC(t *testing.T) {
 			validate: func(t *testing.T, h *testHelper, deploymentName string) {
 				// Verify ServiceAccount exists with custom name
 				sa, err := h.clientset.CoreV1().ServiceAccounts(h.namespace).Get(context.TODO(), "custom-sa", metav1.GetOptions{})
-				require.NoError(t, err)
+				if !assert.NoError(t, err, "ServiceAccount should exist") {
+					return
+				}
 				assert.Equal(t, "custom-sa", sa.Name)
 			},
 		},
@@ -87,12 +93,16 @@ func TestRBAC(t *testing.T) {
 				// Verify approver ClusterRole exists
 				approverRoleName := "cert-manager-controller-approve:awspca-cert-manager-io"
 				clusterRole, err := h.clientset.RbacV1().ClusterRoles().Get(context.TODO(), approverRoleName, metav1.GetOptions{})
-				require.NoError(t, err)
+				if !assert.NoError(t, err, "Approver ClusterRole should exist") {
+					return
+				}
 				assert.NotEmpty(t, clusterRole.Rules)
 
 				// Verify approver ClusterRoleBinding exists
 				clusterRoleBinding, err := h.clientset.RbacV1().ClusterRoleBindings().Get(context.TODO(), approverRoleName, metav1.GetOptions{})
-				require.NoError(t, err)
+				if !assert.NoError(t, err, "Approver ClusterRoleBinding should exist") {
+					return
+				}
 				assert.Equal(t, approverRoleName, clusterRoleBinding.RoleRef.Name)
 				assert.Len(t, clusterRoleBinding.Subjects, 1)
 				assert.Equal(t, "cert-manager", clusterRoleBinding.Subjects[0].Name)
