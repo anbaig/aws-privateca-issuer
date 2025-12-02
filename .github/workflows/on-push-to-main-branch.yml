@@ -5,7 +5,9 @@ on:
     branches: [ main ]
 
 env:
-  ECR_REPO: public.ecr.aws/c9o0b7e4
+  TEST_ECR_REPO: public.ecr.aws/c9o0b7e4
+  PROD_ECR_REPO: public.ecr.aws/c9o0b7e4
+  ECR_USER_AGENT: aws-privateca-issuer
 
 jobs:
   build:
@@ -34,7 +36,7 @@ jobs:
     - name: Setup Push to ECR
       run: |
         export PLUGIN_VERSION=$(git describe --tags)
-        export TAG_BASE=${{ env.ECR_REPO }}/$(echo ${GITHUB_REPOSITORY,,} | sed s#/#-#)-test
+        export TAG_BASE=${{ env.TEST_ECR_REPO }}/$(echo ${GITHUB_REPOSITORY,,} | sed s#/#-#)-test
         echo TAG_BASE=$TAG_BASE >> $GITHUB_ENV
         echo PLUGIN_VERSION=$PLUGIN_VERSION >> $GITHUB_ENV
     - name: Build and push container images
@@ -154,3 +156,42 @@ jobs:
     needs: version-bump
     if: ${{ needs.version-bump.outputs.bump_type != 'none' }}
     uses: './.github/workflows/helm-test.yml'
+
+  build-public:
+    name: release
+    needs: [run-for-arm, run-for-x86, run-helm-tests, get-versions]
+    if: ${{ needs.run-for-arm.result == 'success' && needs.run-for-x86.result == 'success' && needs.run-helm-tests.result == 'success' && needs.get-versions.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Setup Dockerx
+        uses: docker/setup-buildx-action@v1
+      - name: Setup AWS Credentials
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          role-to-assume: arn:aws:iam::905418208571:role/GithubActionsPublishRole-wrichman-us-east-1
+          aws-region: us-east-1
+      - name: Login to Public ECR
+        uses: docker/login-action@v1
+        with:
+          registry: public.ecr.aws
+        env:
+          AWS_REGION: us-east-1
+      - name: Setup Push to Public ECR
+        run: |
+          export TAG_BASE=${{ env.PROD_ECR_REPO }}/$(echo ${GITHUB_REPOSITORY,,} | sed s#/#-#)
+          echo TAG_BASE=$TAG_BASE >> $GITHUB_ENV
+      - name: Build and push container images
+        uses: docker/build-push-action@v6
+        with:
+          build-args: |
+            pkg_version=${{ needs.get-versions.outputs.new_version }}
+            user_agent=${{ env.ECR_USER_AGENT }}
+          context: .
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.TAG_BASE }}:latest
+            ${{ env.TAG_BASE }}:${{steps.tag.outputs.tag}}
+          push: true
