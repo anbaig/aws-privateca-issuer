@@ -150,6 +150,7 @@ jobs:
     # uses: './.github/workflows/on-safe-to-test-label.yml'
     # with:
     #   architecture: 'arm64'
+    #   environment: 'beta'
 
   run-for-x86:
     needs: version-bump
@@ -162,6 +163,7 @@ jobs:
     # uses: './.github/workflows/on-safe-to-test-label.yml'
     # with:
     #   architecture: 'x86_64'
+    #   environment: 'beta'
 
   run-helm-tests:
     needs: version-bump
