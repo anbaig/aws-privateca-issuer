@@ -14,6 +14,17 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Debug - Check directory structure
+      run: |
+        echo "Current directory:"
+        pwd
+        echo "Directory contents:"
+        ls -la
+        echo "Tests directory:"
+        ls -la tests/ || echo "tests directory not found"
+        echo "Tests/helm directory:"
+        ls -la tests/helm/ || echo "tests/helm directory not found"
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
@@ -24,5 +35,17 @@ jobs:
       with:
         version: '3.16.4'
 
+    - name: Debug - Check Makefile targets
+      run: |
+        echo "Checking for e2eHelmTest target:"
+        grep -A 3 "e2eHelmTest:" Makefile || echo "e2eHelmTest target not found"
+
     - name: Run Helm End-to-End Tests
-      run: make e2eHelmTest
+      run: |
+        if [ -d "tests/helm" ]; then
+          echo "tests/helm directory found, running tests directly"
+          cd tests/helm && go mod tidy && go test -v ./... -timeout=15m
+        else
+          echo "tests/helm directory not found, cannot run tests"
+          exit 1
+        fi
