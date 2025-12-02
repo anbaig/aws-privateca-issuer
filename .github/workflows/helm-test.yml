@@ -41,6 +41,12 @@ jobs:
         export HOME=$GITHUB_WORKSPACE
         echo HOME=$HOME >> $GITHUB_ENV
 
+    - name: Download and verify Go dependencies
+      run: |
+        go mod download
+        go mod verify
+        go mod tidy
+
     - name: Run test cases with Kind cluster
       run: |
         make e2eHelmTest
