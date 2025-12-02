@@ -33,13 +33,20 @@ type testHelper struct {
 func setupTest(t *testing.T) *testHelper {
 	// Use existing cluster setup from make target
 	kubeconfig := "/tmp/pca_kubeconfig"
+	t.Logf("Attempting to use kubeconfig: %s", kubeconfig)
+	
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
+		t.Logf("Failed to load kubeconfig: %v", err)
 		t.Skipf("Skipping e2e test - no Kubernetes cluster available: %v", err)
 	}
+	
+	t.Logf("Successfully loaded kubeconfig, server: %s", config.Host)
 
 	clientset, err := kubernetes.NewForConfig(config)
 	require.NoError(t, err)
+	
+	t.Logf("Successfully created Kubernetes clientset")
 
 	// Create test namespace
 	ns := &corev1.Namespace{
@@ -49,7 +56,10 @@ func setupTest(t *testing.T) *testHelper {
 	}
 	_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
+		t.Logf("Failed to create namespace: %v", err)
 		require.NoError(t, err)
+	} else {
+		t.Logf("Successfully created/verified namespace: %s", testNamespace)
 	}
 
 	return &testHelper{
@@ -67,17 +77,21 @@ func (h *testHelper) cleanup() {
 }
 
 func (h *testHelper) installChart(values map[string]interface{}) *release.Release {
+	h.t.Logf("Starting chart installation with values: %+v", values)
+	
 	settings := cli.New()
 	settings.KubeConfig = "/tmp/pca_kubeconfig" // Use the same kubeconfig as manual install
 	actionConfig := new(action.Configuration)
 
 	err := actionConfig.Init(settings.RESTClientGetter(), h.namespace, "secret", func(format string, v ...interface{}) {
-		h.t.Logf(format, v...)
+		h.t.Logf("Helm: "+format, v...)
 	})
 	require.NoError(h.t, err)
+	h.t.Logf("Helm action configuration initialized successfully")
 
 	// Generate unique release name
 	releaseName := fmt.Sprintf("%s-%d", releasePrefix, time.Now().UnixNano())
+	h.t.Logf("Generated release name: %s", releaseName)
 
 	install := action.NewInstall(actionConfig)
 	install.ReleaseName = releaseName
@@ -86,8 +100,10 @@ func (h *testHelper) installChart(values map[string]interface{}) *release.Releas
 	install.Wait = false // Don't wait for pods to be ready
 	install.Timeout = 2 * time.Minute
 
+	h.t.Logf("Loading chart from path: %s", chartPath)
 	chart, err := loader.Load(chartPath)
 	require.NoError(h.t, err)
+	h.t.Logf("Chart loaded successfully: %s-%s", chart.Name(), chart.Metadata.Version)
 
 	// Override image for testing to use a simple image that works
 	if values == nil {
@@ -102,7 +118,10 @@ func (h *testHelper) installChart(values map[string]interface{}) *release.Releas
 	values["approverRole"] = map[string]interface{}{
 		"enabled": false,
 	}
+	
+	h.t.Logf("Final values for installation: %+v", values)
 
+	h.t.Logf("Installing chart...")
 	release, err := install.Run(chart, values)
 	require.NoError(h.t, err)
 

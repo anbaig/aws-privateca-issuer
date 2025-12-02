@@ -43,8 +43,7 @@ jobs:
 
     - name: Run test cases with Kind cluster
       run: |
-        make cluster
-        cd tests/helm && go mod tidy && go test -v ./... -timeout=15m
+        make e2eHelmTest
 
     - name: Terminate Kind cluster
       if: always()

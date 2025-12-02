@@ -324,7 +324,7 @@ cluster: manager create-local-registry kind-cluster deploy-cert-manager install-
 .PHONY: cluster-beta
 cluster-beta: manager kind-cluster deploy-cert-manager install-beta-ecr
 
-e2eHelmTest: manager kind-cluster deploy-cert-manager
+e2eHelmTest: manager create-local-registry kind-cluster deploy-cert-manager
 	cd tests/helm && go mod tidy && go test -v ./... -timeout=15m
 
 # ==================================

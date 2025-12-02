@@ -178,7 +178,7 @@ func TestDeployment(t *testing.T) {
 			release := helper.installChart(tt.values)
 			defer helper.uninstallChart(release.Name)
 
-			deploymentName := release.Name + "-aws-privateca-issuer"
+			deploymentName := release.Name
 			helper.waitForDeployment(deploymentName)
 			tt.validate(t, helper, deploymentName)
 
