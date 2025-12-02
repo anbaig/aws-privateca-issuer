@@ -71,7 +71,7 @@ jobs:
 
             core.info('Commit: ' + context.sha);
             core.info('Commits: ' + commits.data);
-
+            core.setOutput('bump_type', 'none');
             if (commits.data.length > 0) {
               const labels = commits.data[0].labels.map(label => label.name);
               core.info('PR Labels:' + labels);
@@ -83,11 +83,7 @@ jobs:
                 core.setOutput('bump_type', 'minor');
               } else if (hasPatch) {
                 core.setOutput('bump_type', 'patch');
-              } else {
-                core.setOutput('bump_type', 'none');
               }
-            } else {
-              core.setOutput('bump_type', 'none');
             }
       - name: No version bump
         if: steps.pr_labels.outputs.bump_type == 'none'
