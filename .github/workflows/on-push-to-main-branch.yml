@@ -72,7 +72,7 @@ jobs:
 
             if (commits.data.length > 0) {
               const labels = commits.data[0].labels.map(label => label.name);
-              console.log('PR Labels:', labels);
+              core.info('PR Labels:' + labels);
 
               const hasMinor = labels.includes('Minor Version');
               const hasPatch = labels.includes('Patch');
