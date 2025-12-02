@@ -240,7 +240,18 @@ func (h *testHelper) waitForDeployment(name string) {
 			if err == nil {
 				h.t.Logf("Available deployments in namespace %s:", h.namespace)
 				for _, dep := range deployments.Items {
-					h.t.Logf("  - %s", dep.Name)
+					h.t.Logf("  - %s (Ready: %d/%d)", dep.Name, dep.Status.ReadyReplicas, dep.Status.Replicas)
+					
+					// Log deployment conditions if not ready
+					if dep.Status.ReadyReplicas != dep.Status.Replicas {
+						h.t.Logf("    Deployment %s conditions:", dep.Name)
+						for _, cond := range dep.Status.Conditions {
+							h.t.Logf("      %s: %s - %s", cond.Type, cond.Status, cond.Message)
+						}
+						
+						// Get pod details for this deployment
+						h.logPodFailures(dep.Name)
+					}
 				}
 			}
 			h.t.Fatalf("Timeout waiting for deployment %s to be created", name)
@@ -252,6 +263,44 @@ func (h *testHelper) waitForDeployment(name string) {
 				return // Deployment exists, that's enough for our tests
 			}
 			time.Sleep(1 * time.Second)
+		}
+	}
+}
+
+func (h *testHelper) logPodFailures(deploymentName string) {
+	pods, err := h.clientset.CoreV1().Pods(h.namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("app.kubernetes.io/name=aws-privateca-issuer,app.kubernetes.io/instance=%s", deploymentName),
+	})
+	if err != nil {
+		h.t.Logf("    Failed to get pods for deployment %s: %v", deploymentName, err)
+		return
+	}
+
+	for _, pod := range pods.Items {
+		h.t.Logf("    Pod %s: Phase=%s", pod.Name, pod.Status.Phase)
+		
+		// Log container statuses
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			h.t.Logf("      Container %s: Ready=%t, RestartCount=%d", 
+				containerStatus.Name, containerStatus.Ready, containerStatus.RestartCount)
+			
+			if containerStatus.State.Waiting != nil {
+				h.t.Logf("        Waiting: %s - %s", 
+					containerStatus.State.Waiting.Reason, containerStatus.State.Waiting.Message)
+			}
+			if containerStatus.State.Terminated != nil {
+				h.t.Logf("        Terminated: %s - %s (Exit Code: %d)", 
+					containerStatus.State.Terminated.Reason, 
+					containerStatus.State.Terminated.Message,
+					containerStatus.State.Terminated.ExitCode)
+			}
+		}
+		
+		// Log pod conditions
+		for _, cond := range pod.Status.Conditions {
+			if cond.Status != "True" {
+				h.t.Logf("      Condition %s: %s - %s", cond.Type, cond.Status, cond.Message)
+			}
 		}
 	}
 }
