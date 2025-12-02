@@ -39,6 +39,17 @@ jobs:
     - name: Create Kind cluster
       run: make kind-cluster
 
+    - name: Debug - Check kubeconfig file
+      run: |
+        echo "Checking for kubeconfig file:"
+        ls -la /tmp/pca_kubeconfig || echo "kubeconfig file not found"
+        if [ -f /tmp/pca_kubeconfig ]; then
+          echo "Kubeconfig file exists, contents:"
+          cat /tmp/pca_kubeconfig
+          echo "Testing kubectl access:"
+          kubectl get nodes --kubeconfig=/tmp/pca_kubeconfig || echo "kubectl access failed"
+        fi
+
     - name: Deploy cert-manager
       run: make deploy-cert-manager
 
