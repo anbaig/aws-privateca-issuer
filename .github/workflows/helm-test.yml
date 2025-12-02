@@ -33,8 +33,7 @@ jobs:
     - name: Set up Docker
       uses: docker/setup-buildx-action@v3
 
-    - name: Set up cluster (like safe-to-test workflow)
-      run: make cluster
-
-    - name: Run Helm tests
-      run: cd tests/helm && go mod tidy && go test -v ./... -timeout=15m
+    - name: Create cluster and run helm tests
+      run: |
+        make cluster
+        cd tests/helm && go mod tidy && go test -v ./... -timeout=15m
