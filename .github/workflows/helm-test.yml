@@ -30,25 +30,20 @@ jobs:
       with:
         version: 'v1.28.0'
 
-    - name: Set up Docker
-      uses: docker/setup-buildx-action@v3
+    - name: Set up Kind
+      uses: helm/kind-action@v1
+      with:
+        cluster_name: pca-external-issuer
+        config: e2e/kind_config/config.yaml
+
+    - name: Export kubeconfig to expected location
+      run: |
+        kind get kubeconfig --name pca-external-issuer > /tmp/pca_kubeconfig
+        echo "Kubeconfig created at /tmp/pca_kubeconfig"
+        ls -la /tmp/pca_kubeconfig
 
     - name: Build manager binary
       run: make manager
-
-    - name: Create Kind cluster
-      run: make kind-cluster
-
-    - name: Debug - Check kubeconfig file
-      run: |
-        echo "Checking for kubeconfig file:"
-        ls -la /tmp/pca_kubeconfig || echo "kubeconfig file not found"
-        if [ -f /tmp/pca_kubeconfig ]; then
-          echo "Kubeconfig file exists, contents:"
-          cat /tmp/pca_kubeconfig
-          echo "Testing kubectl access:"
-          kubectl get nodes --kubeconfig=/tmp/pca_kubeconfig || echo "kubectl access failed"
-        fi
 
     - name: Deploy cert-manager
       run: make deploy-cert-manager
