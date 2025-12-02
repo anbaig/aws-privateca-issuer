@@ -70,9 +70,61 @@ func setupTest(t *testing.T) *testHelper {
 }
 
 func (h *testHelper) cleanup() {
+	// Clean up cluster-scoped resources first (they don't get deleted with namespace)
+	h.cleanupClusterResources()
+	
+	// Then delete the namespace
 	err := h.clientset.CoreV1().Namespaces().Delete(context.TODO(), h.namespace, metav1.DeleteOptions{})
 	if err != nil && !strings.Contains(err.Error(), "not found") {
 		h.t.Logf("Failed to cleanup namespace: %v", err)
+	}
+}
+
+func (h *testHelper) cleanupClusterResources() {
+	// List all releases in this namespace to find cluster resources to clean up
+	releases, err := h.clientset.CoreV1().Secrets(h.namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "owner=helm",
+	})
+	if err != nil {
+		h.t.Logf("Failed to list Helm releases for cleanup: %v", err)
+		return
+	}
+
+	for _, secret := range releases.Items {
+		if strings.HasPrefix(secret.Name, "sh.helm.release.v1.") {
+			// Extract release name from secret name
+			parts := strings.Split(secret.Name, ".")
+			if len(parts) >= 4 {
+				releaseName := parts[3]
+				h.cleanupClusterResourcesForRelease(releaseName)
+			}
+		}
+	}
+}
+
+func (h *testHelper) cleanupClusterResourcesForRelease(releaseName string) {
+	// Clean up ClusterRole
+	err := h.clientset.RbacV1().ClusterRoles().Delete(context.TODO(), releaseName, metav1.DeleteOptions{})
+	if err != nil && !strings.Contains(err.Error(), "not found") {
+		h.t.Logf("Failed to cleanup ClusterRole %s: %v", releaseName, err)
+	}
+
+	// Clean up ClusterRoleBinding
+	err = h.clientset.RbacV1().ClusterRoleBindings().Delete(context.TODO(), releaseName, metav1.DeleteOptions{})
+	if err != nil && !strings.Contains(err.Error(), "not found") {
+		h.t.Logf("Failed to cleanup ClusterRoleBinding %s: %v", releaseName, err)
+	}
+
+	// Clean up approver ClusterRole and ClusterRoleBinding
+	approverRoleName := "cert-manager-controller-approve:awspca-cert-manager-io"
+	err = h.clientset.RbacV1().ClusterRoles().Delete(context.TODO(), approverRoleName, metav1.DeleteOptions{})
+	if err != nil && !strings.Contains(err.Error(), "not found") {
+		h.t.Logf("Failed to cleanup approver ClusterRole %s: %v", approverRoleName, err)
+	}
+
+	err = h.clientset.RbacV1().ClusterRoleBindings().Delete(context.TODO(), approverRoleName, metav1.DeleteOptions{})
+	if err != nil && !strings.Contains(err.Error(), "not found") {
+		h.t.Logf("Failed to cleanup approver ClusterRoleBinding %s: %v", approverRoleName, err)
 	}
 }
 
