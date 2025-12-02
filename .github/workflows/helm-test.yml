@@ -1,7 +1,6 @@
 name: Helm Chart End-to-End Tests
 
 on:
-  workflow_call:
   push:
     branches: [ main, helm-testing-implementation ]
   pull_request:
@@ -25,8 +24,15 @@ jobs:
       with:
         version: '3.16.4'
 
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'v1.28.0'
+
     - name: Set up Docker
       uses: docker/setup-buildx-action@v3
 
-    - name: Run Helm End-to-End Tests
-      run: make e2eHelmTest
+    - name: Run Helm End-to-End Tests with verbose output
+      run: |
+        echo "Running make e2eHelmTest..."
+        make e2eHelmTest -d
