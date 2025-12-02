@@ -30,23 +30,11 @@ jobs:
       with:
         version: 'v1.28.0'
 
-    - name: Set up Kind
-      uses: helm/kind-action@v1
-      with:
-        cluster_name: pca-external-issuer
-        config: e2e/kind_config/config.yaml
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
 
-    - name: Export kubeconfig to expected location
-      run: |
-        kind get kubeconfig --name pca-external-issuer > /tmp/pca_kubeconfig
-        echo "Kubeconfig created at /tmp/pca_kubeconfig"
-        ls -la /tmp/pca_kubeconfig
-
-    - name: Build manager binary
-      run: make manager
-
-    - name: Deploy cert-manager
-      run: make deploy-cert-manager
+    - name: Set up cluster (like safe-to-test workflow)
+      run: make cluster
 
     - name: Run Helm tests
       run: cd tests/helm && go mod tidy && go test -v ./... -timeout=15m
