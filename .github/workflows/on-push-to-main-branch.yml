@@ -50,6 +50,8 @@ jobs:
         push: true
   version-bump:
     runs-on: ubuntu-latest
+    outputs:
+      bump_type: steps.pr_labels.outputs.bump_type
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -87,65 +89,26 @@ jobs:
             } else {
               core.setOutput('bump_type', 'none');
             }
-
-      - name: Run tests for ARM
-        if: steps.pr_labels.outputs.bump_type != 'none'
-        uses: './.github/workflows/on-safe-to-test-label.yml'
-        with:
-          architecture: 'arm64'
-      - name: Run tests for x86
-        if: steps.pr_labels.outputs.bump_type != 'none'
-        uses: './.github/workflows/on-safe-to-test-label.yml'
-        with:
-          architecture: 'x86_64'
-      - name: Run helm tests
-        if: steps.pr_labels.outputs.bump_type != 'none'
-        uses: './.github/workflows/helm-test.yml'
-
-      - name: Get current version
-        id: get_version
-        if: steps.pr_labels.outputs.bump_type != 'none'
-        run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
-          echo "Current version: $LATEST_TAG"
-          echo "current_version=$LATEST_TAG" >> $GITHUB_OUTPUT
-
-      - name: Bump version
-        id: bump_version
-        if: steps.pr_labels.outputs.bump_type != 'none'
-        run: |
-          CURRENT="${{ steps.get_version.outputs.current_version }}"
-          BUMP_TYPE="${{ steps.pr_labels.outputs.bump_type }}"
-
-          CURRENT=${CURRENT#v}
-
-          IFS='.' read -r -a VERSION_PARTS <<< "$CURRENT"
-          MAJOR="${VERSION_PARTS[0]}"
-          MINOR="${VERSION_PARTS[1]}"
-          PATCH="${VERSION_PARTS[2]}"
-
-          if [ "$BUMP_TYPE" = "minor" ]; then
-            MINOR=$((MINOR + 1))
-            PATCH=0
-          elif [ "$BUMP_TYPE" = "patch" ]; then
-            PATCH=$((PATCH + 1))
-          fi
-
-          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
-          echo "New version: $NEW_VERSION"
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "version_number=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
-
-      - name: Create and push tag
-        if: steps.pr_labels.outputs.bump_type != 'none'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
-          echo $NEW_VERSION
-
       - name: No version bump
         if: steps.pr_labels.outputs.bump_type == 'none'
         run: |
           echo "No version bump label found. Skipping version update."
+      
+  run-for-arm:
+    needs: version-bump
+    if: ${{ needs.version-bump.outputs.bump_type != 'none' }}
+    uses: './.github/workflows/on-safe-to-test-label.yml'
+    with:
+      architecture: 'arm64'
 
+  run-for-x86:
+    needs: version-bump
+    if: ${{ needs.version-bump.outputs.bump_type != 'none' }}
+    uses: './.github/workflows/on-safe-to-test-label.yml'
+    with:
+      architecture: 'x86_64'
+
+  run-helm-tests:
+    needs: version-bump
+    if: ${{ needs.version-bump.outputs.bump_type != 'none' }}
+    uses: './.github/workflows/helm-test.yml'
