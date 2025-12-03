@@ -170,10 +170,35 @@ jobs:
     if: ${{ needs.version-bump.outputs.bump_type != 'none' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Run
-        run: |
-          echo "Done"
-    # uses: './.github/workflows/helm-test.yml'
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+    - name: Set up Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: '3.16.4'
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'v1.28.0'
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
+    - name: Install Development Tools
+      run: sudo apt-get update && sudo apt-get install -y build-essential
+    - name: Download and verify Go dependencies
+      run: |
+        go mod download
+        go mod verify
+        go mod tidy
+    - name: Run test cases with Kind cluster
+      run: |
+        make helmE2ETestBeta
+    - name: Terminate Kind cluster
+      if: always()
+      run: make kind-cluster-delete
 
   update-chart:
     needs: [run-for-arm-beta, run-for-x86-beta, run-helm-tests-beta, get-versions]
@@ -278,10 +303,35 @@ jobs:
     if: ${{ needs.publish-helm-chart.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Run
-        run: |
-          echo "Done"
-    # uses: './.github/workflows/helm-test.yml'
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+    - name: Set up Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: '3.16.4'
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'v1.28.0'
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
+    - name: Install Development Tools
+      run: sudo apt-get update && sudo apt-get install -y build-essential
+    - name: Download and verify Go dependencies
+      run: |
+        go mod download
+        go mod verify
+        go mod tidy
+    - name: Run test cases with Kind cluster
+      run: |
+        make helmE2ETestProd
+    - name: Terminate Kind cluster
+      if: always()
+      run: make kind-cluster-delete
 
   release:
     needs: [run-for-arm-prod, run-for-x86-prod, run-helm-tests-prod, get-versions]
