@@ -11,6 +11,8 @@ env:
 
 jobs:
   build:
+    needs: get-versions
+    if: ${{ needs.get-versions.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -43,12 +45,12 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         build-args: |
-          pkg_version=${{ env.PLUGIN_VERSION }}
+          pkg_version=${{ needs.get-versions.outputs.new_version }}
         context: .
         platforms: linux/amd64,linux/arm64
         tags: |
           ${{ env.TAG_BASE }}:latest
-          ${{ env.TAG_BASE }}:${{ env.PLUGIN_VERSION }}
+          ${{ env.TAG_BASE }}:${{ needs.get-versions.outputs.new_version }}
         push: true
 
   version-bump:
@@ -138,6 +140,30 @@ jobs:
           echo "New version: $NEW_VERSION"
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "version_number=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
+
+  version-validation-beta:
+    needs: [get-versions, build]
+    if: ${{ needs.get-versions.result == 'success' && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - name: Validate Beta Image Version
+        run: make validate-image-version STAGE=beta VERSION=${{ needs.get-versions.outputs.new_version }}
+
+  version-validation-prod:
+    needs: [get-versions, build-public-ecr]
+    if: ${{ needs.get-versions.result == 'success' && needs.build-public-ecr.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - name: Validate Prod Image Version
+        run: make validate-image-version STAGE=prod VERSION=${{ needs.get-versions.outputs.new_version }}
 
   run-for-arm-beta:
     needs: version-bump

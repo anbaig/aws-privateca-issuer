@@ -358,3 +358,11 @@ ${BIN}:
 ${KIND}: ${BIN}
 	curl -sSL -o ${KIND} https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/kind-${OS}-${ARCH}
 	chmod +x ${KIND}
+
+# ==================================
+# Image Version Validation
+# ==================================
+
+.PHONY: validate-image-version
+validate-image-version: ## Validate version tags in container images by stage
+	@go run validate-image-version.go $(STAGE) $(VERSION)
