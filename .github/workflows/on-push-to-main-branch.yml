@@ -10,7 +10,7 @@ env:
   ECR_USER_AGENT: aws-privateca-issuer
 
 jobs:
-  build:
+  build-beta-ecr:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -139,8 +139,8 @@ jobs:
           echo "version_number=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
 
   version-validation-beta:
-    needs: [get-versions, build]
-    if: ${{ needs.get-versions.result == 'success' && needs.build.result == 'success' }}
+    needs: [get-versions, build-beta-ecr]
+    if: ${{ needs.get-versions.result == 'success' && needs.build-beta-ecr.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
