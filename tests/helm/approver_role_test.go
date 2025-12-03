@@ -28,7 +28,7 @@ func TestApproverRole(t *testing.T) {
 				},
 			},
 			validate: func(t *testing.T, h *testHelper, releaseName string) {
-				clusterRoleName := releaseName + "-aws-privateca-issuer:cert-manager-approve"
+				clusterRoleName := "cert-manager-controller-approve:awspca-cert-manager-io"
 
 				// Verify ClusterRole exists for approval
 				clusterRole, err := h.clientset.RbacV1().ClusterRoles().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
@@ -38,8 +38,8 @@ func TestApproverRole(t *testing.T) {
 				found := false
 				for _, rule := range clusterRole.Rules {
 					if contains(rule.APIGroups, "cert-manager.io") &&
-						contains(rule.Resources, "certificaterequests") &&
-						contains(rule.Verbs, "update") {
+						contains(rule.Resources, "signers") &&
+						contains(rule.Verbs, "approve") {
 						found = true
 						break
 					}
