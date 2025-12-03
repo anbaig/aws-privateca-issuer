@@ -182,6 +182,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
       - name: Modify chart
         run: |
           NEW_VERSION="${{ needs.get-versions.outputs.new_version }}"
