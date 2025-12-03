@@ -11,6 +11,8 @@ env:
 
 jobs:
   build-beta-ecr:
+    needs: get-versions
+    if: ${{ needs.get-versions.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -139,8 +141,8 @@ jobs:
           echo "version_number=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
 
   version-validation-beta:
-    needs: [get-versions, build-beta-ecr]
-    if: ${{ needs.get-versions.result == 'success' && needs.build-beta-ecr.result == 'success' }}
+    needs: [run-for-arm-beta, run-for-x86-beta, run-helm-tests-beta]
+    if: ${{ needs.run-for-arm-beta.result == 'success' && needs.run-for-x86-beta.result == 'success' && needs.run-helm-tests-beta.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -151,8 +153,8 @@ jobs:
         run: make validate-image-version STAGE=beta VERSION=${{ needs.get-versions.outputs.new_version }}
 
   version-validation-prod:
-    needs: [get-versions, build-public-ecr]
-    if: ${{ needs.get-versions.result == 'success' && needs.build-public-ecr.result == 'success' }}
+    needs: [run-for-arm-prod, run-for-x86-prod, run-helm-tests-prod]
+    if: ${{ needs.run-for-arm-prod.result == 'success' && needs.run-for-x86-prod.result == 'success' && needs.run-helm-tests-prod.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -221,8 +223,8 @@ jobs:
       run: make kind-cluster-delete
 
   update-chart:
-    needs: [run-for-arm-beta, run-for-x86-beta, run-helm-tests-beta, version-validation-beta, get-versions]
-    if: ${{ needs.run-for-arm-beta.result == 'success' && needs.run-for-x86-beta.result == 'success' && needs.run-helm-tests-beta.result == 'success' && needs.version-validation-beta.result == 'success' && needs.get-versions.result == 'success' }}
+    needs: [version-validation-beta, get-versions]
+    if: ${{ needs.version-validation-beta.result == 'success' && needs.get-versions.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -244,7 +246,7 @@ jobs:
           git push
 
   build-public-ecr:
-    needs: [get-versions, update-chart]
+    needs: update-chart
     if: ${{ needs.update-chart.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
@@ -284,8 +286,8 @@ jobs:
           push: true
 
   publish-helm-chart:
-    needs: [build-public-ecr, update-chart]
-    if: ${{ needs.build-public-ecr.result == 'success' && needs.update-chart.result == 'success' }}
+    needs: build-public-ecr
+    if: ${{ needs.build-public-ecr.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Publish Helm chart
@@ -293,7 +295,7 @@ jobs:
           echo "Done"
 
   run-for-arm-prod:
-    needs: [publish-helm-chart]
+    needs: publish-helm-chart
     if: ${{ needs.publish-helm-chart.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -306,7 +308,7 @@ jobs:
     #   environment: 'prod'
 
   run-for-x86-prod:
-    needs: [publish-helm-chart]
+    needs: publish-helm-chart
     if: ${{ needs.publish-helm-chart.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -319,7 +321,7 @@ jobs:
     #   environment: 'prod'
 
   run-helm-tests-prod:
-    needs: [publish-helm-chart]
+    needs: publish-helm-chart
     if: ${{ needs.publish-helm-chart.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -354,8 +356,8 @@ jobs:
       run: make kind-cluster-delete
 
   release:
-    needs: [run-for-arm-prod, run-for-x86-prod, run-helm-tests-prod, version-validation-prod, get-versions]
-    if: ${{ needs.run-for-arm-prod.result == 'success' && needs.run-for-x86-prod.result == 'success' && needs.run-helm-tests-prod.result == 'success' && needs.version-validation-prod.result == 'success'}}
+    needs: version-validation-prod
+    if: ${{ needs.version-validation-prod.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
