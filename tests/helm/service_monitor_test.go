@@ -1,17 +1,18 @@
 package helm
 
 import (
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"testing"
 )
 
 func TestServiceMonitor(t *testing.T) {
-	helper := setupTest(t)
-	defer helper.cleanup()
+	helper := testutil.SetupTest(t)
+	defer helper.Cleanup()
 
 	tests := []struct {
 		name     string
 		values   map[string]interface{}
-		validate func(t *testing.T, h *testHelper, releaseName string)
+		validate func(t *testing.T, h *testutil.TestHelper, releaseName string)
 	}{
 		{
 			name: "serviceMonitor enabled creates ServiceMonitor resource",
@@ -20,7 +21,7 @@ func TestServiceMonitor(t *testing.T) {
 					"create": true,
 				},
 			},
-			validate: func(t *testing.T, h *testHelper, releaseName string) {
+			validate: func(t *testing.T, h *testutil.TestHelper, releaseName string) {
 				t.Log("ServiceMonitor test passed - chart installed successfully with serviceMonitor.create=true")
 			},
 		},
@@ -28,15 +29,15 @@ func TestServiceMonitor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			release := helper.installChart(tt.values)
+			release := helper.InstallChart(tt.values)
 			if release == nil {
 				t.Skip("Chart installation failed")
 				return
 			}
-			defer helper.uninstallChart(release.Name)
+			defer helper.UninstallChart(release.Name)
 
 			deploymentName := release.Name + "-aws-privateca-issuer"
-			helper.waitForDeployment(deploymentName)
+			helper.WaitForDeployment(deploymentName)
 
 			if !t.Failed() {
 				tt.validate(t, helper, release.Name)

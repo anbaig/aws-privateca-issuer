@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"context"
 	"testing"
 
@@ -10,22 +11,22 @@ import (
 )
 
 func TestDeployment(t *testing.T) {
-	helper := setupTest(t)
-	defer helper.cleanup()
+	helper := testutil.SetupTest(t)
+	defer helper.Cleanup()
 
 	tests := []struct {
 		name     string
 		values   map[string]interface{}
-		validate func(t *testing.T, h *testHelper, releaseName string)
+		validate func(t *testing.T, h *testutil.TestHelper, releaseName string)
 	}{
 		{
 			name: "disableApprovedCheck adds command line flag",
 			values: map[string]interface{}{
 				"disableApprovedCheck": true,
 			},
-			validate: func(t *testing.T, h *testHelper, releaseName string) {
+			validate: func(t *testing.T, h *testutil.TestHelper, releaseName string) {
 				deploymentName := releaseName + "-aws-privateca-issuer"
-				deployment, err := h.clientset.AppsV1().Deployments(h.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+				deployment, err := h.Clientset.AppsV1().Deployments(h.Namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 				require.NoError(t, err)
 
 				container := deployment.Spec.Template.Spec.Containers[0]
@@ -36,15 +37,15 @@ func TestDeployment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			release := helper.installChart(tt.values)
+			release := helper.InstallChart(tt.values)
 			if release == nil {
 				t.Skip("Chart installation failed")
 				return
 			}
-			defer helper.uninstallChart(release.Name)
+			defer helper.UninstallChart(release.Name)
 
 			deploymentName := release.Name + "-aws-privateca-issuer"
-			helper.waitForDeployment(deploymentName)
+			helper.WaitForDeployment(deploymentName)
 
 			if !t.Failed() {
 				tt.validate(t, helper, release.Name)

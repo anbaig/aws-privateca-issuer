@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -11,22 +12,22 @@ import (
 )
 
 func TestDefaults(t *testing.T) {
-	helper := setupTest(t)
-	defer helper.cleanup()
+	helper := testutil.SetupTest(t)
+	defer helper.Cleanup()
 
 	// Deploy chart with no custom values - validates all defaults
-	release := helper.installChart(map[string]interface{}{})
+	release := helper.InstallChart(map[string]interface{}{})
 	if release == nil {
 		t.Skip("Chart installation failed")
 		return
 	}
-	defer helper.uninstallChart(release.Name)
+	defer helper.UninstallChart(release.Name)
 
 	deploymentName := release.Name + "-aws-privateca-issuer"
-	helper.waitForDeployment(deploymentName)
+	helper.WaitForDeployment(deploymentName)
 
 	// Validate default values
-	deployment, err := helper.clientset.AppsV1().Deployments(helper.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	deployment, err := helper.Clientset.AppsV1().Deployments(helper.Namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 	require.NoError(t, err)
 
 	// Default replica count
@@ -52,26 +53,26 @@ func TestDefaults(t *testing.T) {
 
 	// Validate service defaults
 	serviceName := release.Name + "-aws-privateca-issuer"
-	service, err := helper.clientset.CoreV1().Services(helper.namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+	service, err := helper.Clientset.CoreV1().Services(helper.Namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "ClusterIP", string(service.Spec.Type))
 	assert.Equal(t, int32(8080), service.Spec.Ports[0].Port)
 
 	// Validate PDB defaults
-	pdb, err := helper.clientset.PolicyV1().PodDisruptionBudgets(helper.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	pdb, err := helper.Clientset.PolicyV1().PodDisruptionBudgets(helper.Namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), pdb.Spec.MaxUnavailable.IntVal)
 
 	// Validate affinity defaults
 	affinity := deployment.Spec.Template.Spec.Affinity
 	require.NotNil(t, affinity)
-
+	
 	// Check node affinity for OS/arch requirements
 	nodeAffinity := affinity.NodeAffinity
 	require.NotNil(t, nodeAffinity)
 	assert.Contains(t, nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values, "linux")
 	assert.Contains(t, nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Values, "amd64")
-
+	
 	// Check pod anti-affinity for spreading
 	podAntiAffinity := affinity.PodAntiAffinity
 	require.NotNil(t, podAntiAffinity)

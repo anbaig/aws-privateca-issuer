@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"context"
 	"testing"
 
@@ -10,13 +11,13 @@ import (
 )
 
 func TestApproverRole(t *testing.T) {
-	helper := setupTest(t)
-	defer helper.cleanup()
+	helper := testutil.SetupTest(t)
+	defer helper.Cleanup()
 
 	tests := []struct {
 		name     string
 		values   map[string]interface{}
-		validate func(t *testing.T, h *testHelper, releaseName string)
+		validate func(t *testing.T, h *testutil.TestHelper, releaseName string)
 	}{
 		{
 			name: "approverRole enabled creates ClusterRole for certificate approval",
@@ -27,11 +28,11 @@ func TestApproverRole(t *testing.T) {
 					"namespace":          "cert-manager",
 				},
 			},
-			validate: func(t *testing.T, h *testHelper, releaseName string) {
+			validate: func(t *testing.T, h *testutil.TestHelper, releaseName string) {
 				clusterRoleName := "cert-manager-controller-approve:awspca-cert-manager-io"
 
 				// Verify ClusterRole exists for approval
-				clusterRole, err := h.clientset.RbacV1().ClusterRoles().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
+				clusterRole, err := h.Clientset.RbacV1().ClusterRoles().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
 				require.NoError(t, err)
 
 				// Check that the role has approval permissions
@@ -47,7 +48,7 @@ func TestApproverRole(t *testing.T) {
 				assert.True(t, found, "ClusterRole should have certificate approval permissions")
 
 				// Verify ClusterRoleBinding exists
-				clusterRoleBinding, err := h.clientset.RbacV1().ClusterRoleBindings().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
+				clusterRoleBinding, err := h.Clientset.RbacV1().ClusterRoleBindings().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
 				require.NoError(t, err)
 				assert.Equal(t, clusterRoleName, clusterRoleBinding.RoleRef.Name)
 
@@ -61,15 +62,15 @@ func TestApproverRole(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			release := helper.installChart(tt.values)
+			release := helper.InstallChart(tt.values)
 			if release == nil {
 				t.Skip("Chart installation failed")
 				return
 			}
-			defer helper.uninstallChart(release.Name)
+			defer helper.UninstallChart(release.Name)
 
 			deploymentName := release.Name + "-aws-privateca-issuer"
-			helper.waitForDeployment(deploymentName)
+			helper.WaitForDeployment(deploymentName)
 
 			if !t.Failed() {
 				tt.validate(t, helper, release.Name)

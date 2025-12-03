@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"context"
 	"testing"
 
@@ -10,8 +11,8 @@ import (
 )
 
 func TestOptionalFields(t *testing.T) {
-	helper := setupTest(t)
-	defer helper.cleanup()
+	helper := testutil.SetupTest(t)
+	defer helper.Cleanup()
 
 	// Test optional fields that are typically empty but should work when configured
 	values := map[string]interface{}{
@@ -55,18 +56,18 @@ func TestOptionalFields(t *testing.T) {
 		},
 	}
 
-	release := helper.installChart(values)
+	release := helper.InstallChart(values)
 	if release == nil {
 		t.Skip("Chart installation failed")
 		return
 	}
-	defer helper.uninstallChart(release.Name)
+	defer helper.UninstallChart(release.Name)
 
 	deploymentName := release.Name + "-aws-privateca-issuer"
-	helper.waitForDeployment(deploymentName)
+	helper.WaitForDeployment(deploymentName)
 
 	// Validate optional fields are applied
-	deployment, err := helper.clientset.AppsV1().Deployments(helper.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	deployment, err := helper.Clientset.AppsV1().Deployments(helper.Namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 	require.NoError(t, err)
 
 	podSpec := deployment.Spec.Template.Spec

@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"context"
 	"testing"
 
@@ -11,13 +12,13 @@ import (
 )
 
 func TestPodDisruptionBudget(t *testing.T) {
-	helper := setupTest(t)
-	defer helper.cleanup()
+	helper := testutil.SetupTest(t)
+	defer helper.Cleanup()
 
 	tests := []struct {
 		name     string
 		values   map[string]interface{}
-		validate func(t *testing.T, h *testHelper, releaseName string)
+		validate func(t *testing.T, h *testutil.TestHelper, releaseName string)
 	}{
 		{
 			name: "podDisruptionBudget with maxUnavailable",
@@ -26,9 +27,9 @@ func TestPodDisruptionBudget(t *testing.T) {
 					"maxUnavailable": 1,
 				},
 			},
-			validate: func(t *testing.T, h *testHelper, releaseName string) {
+			validate: func(t *testing.T, h *testutil.TestHelper, releaseName string) {
 				pdbName := releaseName + "-aws-privateca-issuer"
-				pdb, err := h.clientset.PolicyV1().PodDisruptionBudgets(h.namespace).Get(context.TODO(), pdbName, metav1.GetOptions{})
+				pdb, err := h.Clientset.PolicyV1().PodDisruptionBudgets(h.Namespace).Get(context.TODO(), pdbName, metav1.GetOptions{})
 				require.NoError(t, err)
 
 				expectedMaxUnavailable := intstr.FromInt(1)
@@ -39,15 +40,15 @@ func TestPodDisruptionBudget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			release := helper.installChart(tt.values)
+			release := helper.InstallChart(tt.values)
 			if release == nil {
 				t.Skip("Chart installation failed")
 				return
 			}
-			defer helper.uninstallChart(release.Name)
+			defer helper.UninstallChart(release.Name)
 
 			deploymentName := release.Name + "-aws-privateca-issuer"
-			helper.waitForDeployment(deploymentName)
+			helper.WaitForDeployment(deploymentName)
 
 			if !t.Failed() {
 				tt.validate(t, helper, release.Name)

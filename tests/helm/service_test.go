@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"context"
 	"testing"
 
@@ -10,13 +11,13 @@ import (
 )
 
 func TestService(t *testing.T) {
-	helper := setupTest(t)
-	defer helper.cleanup()
+	helper := testutil.SetupTest(t)
+	defer helper.Cleanup()
 
 	tests := []struct {
 		name     string
 		values   map[string]interface{}
-		validate func(t *testing.T, h *testHelper, releaseName string)
+		validate func(t *testing.T, h *testutil.TestHelper, releaseName string)
 	}{
 		{
 			name: "custom service configuration",
@@ -26,9 +27,9 @@ func TestService(t *testing.T) {
 					"port": 9090,
 				},
 			},
-			validate: func(t *testing.T, h *testHelper, releaseName string) {
+			validate: func(t *testing.T, h *testutil.TestHelper, releaseName string) {
 				serviceName := releaseName + "-aws-privateca-issuer"
-				service, err := h.clientset.CoreV1().Services(h.namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+				service, err := h.Clientset.CoreV1().Services(h.Namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
 				require.NoError(t, err)
 
 				assert.Equal(t, "NodePort", string(service.Spec.Type))
@@ -40,10 +41,10 @@ func TestService(t *testing.T) {
 			values: map[string]interface{}{
 				"nameOverride": "custom-issuer",
 			},
-			validate: func(t *testing.T, h *testHelper, releaseName string) {
+			validate: func(t *testing.T, h *testutil.TestHelper, releaseName string) {
 				// With nameOverride, the deployment name should include the custom name
 				deploymentName := releaseName + "-custom-issuer"
-				deployment, err := h.clientset.AppsV1().Deployments(h.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+				deployment, err := h.Clientset.AppsV1().Deployments(h.Namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 				require.NoError(t, err)
 				assert.NotNil(t, deployment)
 			},
@@ -53,10 +54,10 @@ func TestService(t *testing.T) {
 			values: map[string]interface{}{
 				"fullnameOverride": "completely-custom-name",
 			},
-			validate: func(t *testing.T, h *testHelper, releaseName string) {
+			validate: func(t *testing.T, h *testutil.TestHelper, releaseName string) {
 				// With fullnameOverride, the deployment name should be exactly the override
 				deploymentName := "completely-custom-name"
-				deployment, err := h.clientset.AppsV1().Deployments(h.namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+				deployment, err := h.Clientset.AppsV1().Deployments(h.Namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 				require.NoError(t, err)
 				assert.NotNil(t, deployment)
 			},
@@ -65,12 +66,12 @@ func TestService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			release := helper.installChart(tt.values)
+			release := helper.InstallChart(tt.values)
 			if release == nil {
 				t.Skip("Chart installation failed")
 				return
 			}
-			defer helper.uninstallChart(release.Name)
+			defer helper.UninstallChart(release.Name)
 
 			// For naming tests, we need to wait for the correct deployment name
 			var deploymentName string
@@ -82,7 +83,7 @@ func TestService(t *testing.T) {
 				deploymentName = release.Name + "-aws-privateca-issuer"
 			}
 
-			helper.waitForDeployment(deploymentName)
+			helper.WaitForDeployment(deploymentName)
 
 			if !t.Failed() {
 				tt.validate(t, helper, release.Name)

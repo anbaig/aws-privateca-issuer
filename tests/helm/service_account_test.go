@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"context"
 	"testing"
 
@@ -9,13 +10,13 @@ import (
 )
 
 func TestServiceAccount(t *testing.T) {
-	helper := setupTest(t)
-	defer helper.cleanup()
+	helper := testutil.SetupTest(t)
+	defer helper.Cleanup()
 
 	tests := []struct {
 		name     string
 		values   map[string]interface{}
-		validate func(t *testing.T, h *testHelper, releaseName string)
+		validate func(t *testing.T, h *testutil.TestHelper, releaseName string)
 	}{
 		{
 			name: "serviceAccount with custom name",
@@ -28,9 +29,9 @@ func TestServiceAccount(t *testing.T) {
 					},
 				},
 			},
-			validate: func(t *testing.T, h *testHelper, releaseName string) {
+			validate: func(t *testing.T, h *testutil.TestHelper, releaseName string) {
 				serviceAccountName := "custom-service-account"
-				sa, err := h.clientset.CoreV1().ServiceAccounts(h.namespace).Get(context.TODO(), serviceAccountName, metav1.GetOptions{})
+				sa, err := h.Clientset.CoreV1().ServiceAccounts(h.Namespace).Get(context.TODO(), serviceAccountName, metav1.GetOptions{})
 				if !assert.NoError(t, err, "ServiceAccount should exist") {
 					return
 				}
@@ -41,15 +42,15 @@ func TestServiceAccount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			release := helper.installChart(tt.values)
+			release := helper.InstallChart(tt.values)
 			if release == nil {
 				t.Skip("Chart installation failed")
 				return
 			}
-			defer helper.uninstallChart(release.Name)
+			defer helper.UninstallChart(release.Name)
 
 			deploymentName := release.Name + "-aws-privateca-issuer"
-			helper.waitForDeployment(deploymentName)
+			helper.WaitForDeployment(deploymentName)
 
 			if !t.Failed() {
 				tt.validate(t, helper, release.Name)

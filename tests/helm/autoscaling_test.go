@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"context"
 	"testing"
 	"time"
@@ -12,13 +13,13 @@ import (
 )
 
 func TestAutoscaling(t *testing.T) {
-	helper := setupTest(t)
-	defer helper.cleanup()
+	helper := testutil.SetupTest(t)
+	defer helper.Cleanup()
 
 	tests := []struct {
 		name     string
 		values   map[string]interface{}
-		validate func(t *testing.T, h *testHelper, releaseName string)
+		validate func(t *testing.T, h *testutil.TestHelper, releaseName string)
 	}{
 		{
 			name: "autoscaling enabled creates HPA and removes replica count",
@@ -42,7 +43,7 @@ func TestAutoscaling(t *testing.T) {
 					"enabled": false,
 				},
 			},
-			validate: func(t *testing.T, h *testHelper, releaseName string) {
+			validate: func(t *testing.T, h *testutil.TestHelper, releaseName string) {
 				// The HPA name matches the deployment name (release-name-aws-privateca-issuer)
 				hpaName := releaseName + "-aws-privateca-issuer"
 
@@ -53,7 +54,7 @@ func TestAutoscaling(t *testing.T) {
 				// Try to get the HPA with a reasonable timeout
 				for i := 0; i < 5; i++ {
 					time.Sleep(1 * time.Second)
-					hpa, err = h.clientset.AutoscalingV2beta1().HorizontalPodAutoscalers(h.namespace).Get(context.TODO(), hpaName, metav1.GetOptions{})
+					hpa, err = h.Clientset.AutoscalingV2beta1().HorizontalPodAutoscalers(h.Namespace).Get(context.TODO(), hpaName, metav1.GetOptions{})
 					if err == nil {
 						t.Logf("Found HPA %s on attempt %d", hpaName, i+1)
 						break
@@ -66,7 +67,7 @@ func TestAutoscaling(t *testing.T) {
 					t.Logf("HPA not found after retries, checking if autoscaling is supported in this chart version")
 					// Just verify the deployment exists and has reasonable replica settings
 					deploymentFullName := releaseName + "-aws-privateca-issuer"
-					deployment, deployErr := h.clientset.AppsV1().Deployments(h.namespace).Get(context.TODO(), deploymentFullName, metav1.GetOptions{})
+					deployment, deployErr := h.Clientset.AppsV1().Deployments(h.Namespace).Get(context.TODO(), deploymentFullName, metav1.GetOptions{})
 					require.NoError(t, deployErr, "Deployment should exist")
 
 					if deployment.Spec.Replicas != nil {
@@ -83,7 +84,7 @@ func TestAutoscaling(t *testing.T) {
 
 				// Verify Deployment exists and is managed by HPA
 				deploymentFullName := releaseName + "-aws-privateca-issuer"
-				deployment, err := h.clientset.AppsV1().Deployments(h.namespace).Get(context.TODO(), deploymentFullName, metav1.GetOptions{})
+				deployment, err := h.Clientset.AppsV1().Deployments(h.Namespace).Get(context.TODO(), deploymentFullName, metav1.GetOptions{})
 				require.NoError(t, err, "Deployment should exist")
 
 				// When autoscaling is enabled, the deployment should have at least 1 replica
@@ -97,15 +98,15 @@ func TestAutoscaling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			release := helper.installChart(tt.values)
+			release := helper.InstallChart(tt.values)
 			if release == nil {
 				t.Skip("Chart installation failed")
 				return
 			}
-			defer helper.uninstallChart(release.Name)
+			defer helper.UninstallChart(release.Name)
 
 			deploymentName := release.Name + "-aws-privateca-issuer"
-			helper.waitForDeployment(deploymentName)
+			helper.WaitForDeployment(deploymentName)
 
 			// Only run validation if deployment was created successfully
 			if !t.Failed() {
