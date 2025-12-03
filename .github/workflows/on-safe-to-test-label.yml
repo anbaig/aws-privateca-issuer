@@ -10,7 +10,6 @@ on:
         required: false
         type: string
         default: 'local'
-        description: 'Environment to use (local or beta)'
   workflow_call:
     inputs:
       architecture:
@@ -26,7 +25,7 @@ env:
   EC2_INSTANCE_TYPE: ${{ inputs.architecture == 'arm64' && 'c7gn.xlarge' || 'c7a.xlarge' }}
   GO_ARCHITECTURE: ${{ inputs.architecture == 'arm64' && 'arm64' || 'amd64' }}
   KUBECTL_ARCHITECTURE: $GO_ARCHITECTURE
-  CLUSTER_TARGET: ${{ inputs.environment == 'beta' && 'cluster-beta' || 'cluster' }}
+  CLUSTER_TARGET: ${{ inputs.environment == 'local' && 'cluster' || format('cluster-{0}', inputs.environment) }}
 
 jobs:
   start-runner:
