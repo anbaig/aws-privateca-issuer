@@ -36,10 +36,16 @@ func TestDefaults(t *testing.T) {
 	// Default revision history limit
 	assert.Equal(t, int32(10), *deployment.Spec.RevisionHistoryLimit)
 
-	// Default image
+	// Default image (varies by test mode)
 	container := deployment.Spec.Template.Spec.Containers[0]
-	assert.Contains(t, container.Image, "public.ecr.aws/k1n1h4h4/cert-manager-aws-privateca-issuer")
-	assert.Equal(t, "IfNotPresent", string(container.ImagePullPolicy))
+	mode := testutil.GetTestMode()
+	if mode == testutil.BetaMode {
+		assert.Contains(t, container.Image, "public.ecr.aws/cert-manager-aws-privateca-issuer/cert-manager-aws-privateca-issuer-test")
+		assert.Equal(t, "Always", string(container.ImagePullPolicy))
+	} else {
+		assert.Contains(t, container.Image, "public.ecr.aws/k1n1h4h4/cert-manager-aws-privateca-issuer")
+		assert.Equal(t, "IfNotPresent", string(container.ImagePullPolicy))
+	}
 
 	// Default resources
 	assert.Equal(t, resource.MustParse("50m"), container.Resources.Limits["cpu"])
