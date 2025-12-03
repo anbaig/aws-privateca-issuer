@@ -11,47 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestConditionalValuesCoverage(t *testing.T) {
-	// Define values that trigger conditional logic in templates
-	conditionalKeys := []string{
-		"autoscaling.enabled",
-		"rbac.create",
-		"serviceAccount.create",
-		"serviceMonitor.create",
-		"disableApprovedCheck",
-		"disableClientSideRateLimiting",
-		"approverRole.enabled",
-		"podDisruptionBudget",
-		"priorityClassName",
-		"env",
-		"volumes",
-		"volumeMounts",
-		"extraContainers",
-		"podLabels",
-	}
-
-	// Load values.yaml
-	valuesFile, err := os.ReadFile("../../charts/aws-pca-issuer/values.yaml")
-	require.NoError(t, err)
-
-	var values map[string]interface{}
-	err = yaml.Unmarshal(valuesFile, &values)
-	require.NoError(t, err)
-
-	var missing []string
-	for _, key := range conditionalKeys {
-		if !hasNestedKey(values, key) {
-			missing = append(missing, key)
-		}
-	}
-
-	if len(missing) > 0 {
-		t.Errorf("Conditional values missing from values.yaml: %v", missing)
-	}
-}
-
-func TestTemplateValueReferences(t *testing.T) {
-	// Parse all template files for .Values references
+func TestCoverage(t *testing.T) {
+	// Extract all .Values.* references from templates
 	templateDir := "../../charts/aws-pca-issuer/templates"
 	valueRefs := extractValueReferences(t, templateDir)
 
@@ -68,7 +29,7 @@ func TestTemplateValueReferences(t *testing.T) {
 		"autoscaling.targetMemoryUtilizationPercentage": true,
 	}
 
-	// Check each template reference exists in values
+	// Validate each template reference exists in values.yaml
 	var missing []string
 	for _, ref := range valueRefs {
 		if skipValidation[ref] {

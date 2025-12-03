@@ -53,6 +53,7 @@ tests/helm/
 ├── rbac_test.go            # Tests RBAC resource creation
 ├── deployment_test.go      # Tests deployment configuration
 ├── service_monitor_test.go # Tests ServiceMonitor and PDB
+├── coverage_test.go        # Tests template value coverage
 ├── common_test.go          # Shared test utilities
 ├── go.mod                  # Dependencies
 ├── run-tests.sh           # Direct test runner
@@ -79,6 +80,11 @@ All conditional logic in Helm templates through actual deployments:
 - Environment variable injection
 - Volume and volume mount configuration
 - Sidecar container addition
+
+### Coverage Testing (`coverage_test.go`)
+- Validates all `{{ .Values.* }}` template references have corresponding values in values.yaml
+- Ensures template references don't break due to missing configuration values
+- Provides comprehensive coverage of both conditional and non-conditional template logic
 
 ### Service Monitor (`service_monitor_test.go`)
 - ServiceMonitor creation for Prometheus
