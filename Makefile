@@ -302,12 +302,19 @@ install-local: docker-build docker-push-local
 	--set image.repository=${LOCAL_IMAGE} --set image.tag=latest --set image.pullPolicy=Always
 
 .PHONY: install-beta-ecr
-install-beta-ecr: 
-	#install plugin from local docker repo
+install-beta-ecr:
 	sleep 15
 	helm install issuer ./charts/aws-pca-issuer -n ${NAMESPACE} \
 	--set serviceAccount.create=false --set serviceAccount.name=${SERVICE_ACCOUNT} \
 	--set image.repository=public.ecr.aws/cert-manager-aws-privateca-issuer/cert-manager-aws-privateca-issuer-test \
+	--set image.tag=latest --set image.pullPolicy=Always
+
+.PHONY: install-prod-ecr
+install-prod-ecr:
+	sleep 15
+    helm repo add awspca https://cert-manager.github.io/aws-privateca-issuer
+	helm install issuer awspca/aws-privateca-issuer -n ${NAMESPACE}
+	--set serviceAccount.create=false --set serviceAccount.name=${SERVICE_ACCOUNT} \
 	--set image.tag=latest --set image.pullPolicy=Always
 
 .PHONY: uninstall-local
@@ -323,6 +330,9 @@ cluster: manager create-local-registry kind-cluster deploy-cert-manager install-
 
 .PHONY: cluster-beta
 cluster-beta: manager kind-cluster deploy-cert-manager install-beta-ecr
+
+.PHONY: cluster-prod
+cluster-prod: manager kind-cluster deploy-cert-manager install-prod-ecr
 
 deploy-prometheus-crds:
 	kubectl apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.68.0/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml --kubeconfig=/tmp/pca_kubeconfig
