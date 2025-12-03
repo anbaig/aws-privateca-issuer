@@ -16,8 +16,12 @@ import (
 
 func (h *TestHelper) InstallChart(values map[string]interface{}) *release.Release {
 	mode := GetTestMode()
-	h.T.Logf("Starting chart installation in %s mode with values: %+v",
-		map[TestMode]string{PreProdMode: "pre-production", ProdMode: "production"}[mode], values)
+	modeNames := map[TestMode]string{
+		LocalMode: "local",
+		BetaMode:  "beta",
+		ProdMode:  "production",
+	}
+	h.T.Logf("Starting chart installation in %s mode with values: %+v", modeNames[mode], values)
 
 	settings := cli.New()
 	settings.KubeConfig = "/tmp/pca_kubeconfig"
@@ -62,8 +66,9 @@ func (h *TestHelper) InstallChart(values map[string]interface{}) *release.Releas
 		}
 		h.T.Logf("Production chart loaded successfully: %s-%s", chart.Name(), chart.Metadata.Version)
 	} else {
-		// Pre-production mode: Use local chart
-		h.T.Logf("Pre-production mode: Loading chart from local path: %s", LocalChartPath)
+		// Local and Beta modes: Use local chart
+		h.T.Logf("%s mode: Loading chart from local path: %s",
+			map[TestMode]string{LocalMode: "Local", BetaMode: "Beta"}[mode], LocalChartPath)
 		chart, err = loader.Load(LocalChartPath)
 		if !assert.NoError(h.T, err, "Failed to load local chart") {
 			return nil
@@ -77,13 +82,22 @@ func (h *TestHelper) InstallChart(values map[string]interface{}) *release.Releas
 	}
 
 	// Configure image based on mode
-	if mode == PreProdMode {
-		// Pre-production: Override with local image if not specified
+	if mode == LocalMode {
+		// Local mode: Override with local ECR image if not specified
 		if _, exists := values["image"]; !exists {
 			values["image"] = map[string]interface{}{
 				"repository": "public.ecr.aws/k1n1h4h4/cert-manager-aws-privateca-issuer",
 				"tag":        "v1.2.7",
 				"pullPolicy": "IfNotPresent",
+			}
+		}
+	} else if mode == BetaMode {
+		// Beta mode: Override with testECR image if not specified
+		if _, exists := values["image"]; !exists {
+			values["image"] = map[string]interface{}{
+				"repository": "public.ecr.aws/cert-manager-aws-privateca-issuer/cert-manager-aws-privateca-issuer-test",
+				"tag":        "latest",
+				"pullPolicy": "Always",
 			}
 		}
 	}
@@ -116,6 +130,14 @@ func (h *TestHelper) InstallChart(values map[string]interface{}) *release.Releas
 
 	h.T.Logf("Helm release %s installed successfully", release.Name)
 	h.T.Logf("Release manifest length: %d", len(release.Manifest))
+
+	// Validate chart version for production mode
+	if err := h.ValidateChartVersion(release); err != nil {
+		h.T.Errorf("Chart version validation failed: %v", err)
+		// Cleanup the release since validation failed
+		h.UninstallChart(release.Name)
+		return nil
+	}
 
 	time.Sleep(2 * time.Second) // Give time for resources to be created
 

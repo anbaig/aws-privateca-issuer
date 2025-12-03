@@ -2,7 +2,9 @@ package testutil
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -25,15 +28,20 @@ const (
 type TestMode int
 
 const (
-	PreProdMode TestMode = iota
+	LocalMode TestMode = iota
+	BetaMode
 	ProdMode
 )
 
 func GetTestMode() TestMode {
-	if os.Getenv("HELM_TEST_MODE") == "prod" {
+	switch os.Getenv("HELM_TEST_MODE") {
+	case "beta":
+		return BetaMode
+	case "prod":
 		return ProdMode
+	default:
+		return LocalMode
 	}
-	return PreProdMode
 }
 
 type TestHelper struct {
@@ -141,4 +149,72 @@ func (h *TestHelper) cleanupClusterResourcesForRelease(releaseName string) {
 	if err != nil && !strings.Contains(err.Error(), "not found") {
 		h.T.Logf("Failed to cleanup approver ClusterRoleBinding %s: %v", approverRoleName, err)
 	}
+}
+
+// GitHubRelease represents the structure of GitHub API release response
+type GitHubRelease struct {
+	TagName string `json:"tag_name"`
+}
+
+// ValidateChartVersion validates that the installed chart version matches the latest GitHub release
+func (h *TestHelper) ValidateChartVersion(release *release.Release) error {
+	if GetTestMode() != ProdMode {
+		h.T.Logf("Skipping version validation - not in production mode")
+		return nil
+	}
+
+	h.T.Logf("Starting chart version validation for production mode")
+
+	// Get latest release version from GitHub
+	latestVersion, err := h.getLatestGitHubReleaseVersion()
+	if err != nil {
+		return fmt.Errorf("failed to fetch latest GitHub release version: %w", err)
+	}
+
+	// Get installed chart version
+	installedVersion := release.Chart.Metadata.Version
+
+	h.T.Logf("Latest GitHub release version: %s", latestVersion)
+	h.T.Logf("Installed chart version: %s", installedVersion)
+
+	// Compare versions (normalize by removing 'v' prefix if present)
+	normalizedLatest := strings.TrimPrefix(latestVersion, "v")
+	normalizedInstalled := strings.TrimPrefix(installedVersion, "v")
+
+	if normalizedLatest != normalizedInstalled {
+		return fmt.Errorf("version mismatch: installed chart version %s does not match latest GitHub release version %s", installedVersion, latestVersion)
+	}
+
+	h.T.Logf("Chart version validation passed: %s matches %s", installedVersion, latestVersion)
+	return nil
+}
+
+// getLatestGitHubReleaseVersion fetches the latest release version from GitHub API
+func (h *TestHelper) getLatestGitHubReleaseVersion() (string, error) {
+	url := "https://api.github.com/repos/cert-manager/aws-privateca-issuer/releases/latest"
+
+	h.T.Logf("Fetching latest release from: %s", url)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to make HTTP request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var release GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", fmt.Errorf("failed to decode GitHub API response: %w", err)
+	}
+
+	if release.TagName == "" {
+		return "", fmt.Errorf("no tag_name found in GitHub API response")
+	}
+
+	h.T.Logf("Successfully fetched latest release version: %s", release.TagName)
+	return release.TagName, nil
 }
