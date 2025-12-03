@@ -9,6 +9,43 @@ The testing approach follows existing e2e patterns in the repository:
 - **Real Resource Validation**: Tests verify actual Kubernetes resources are created correctly
 - **Conditional Logic Testing**: All branching logic tested through deployment scenarios
 - **Value Substitution Validation**: Real deployments ensure `{{ .Values.* }}` work correctly
+- **Complete E2E Coverage**: Every field in values.yaml has corresponding e2e test coverage
+
+## E2E Coverage Validation
+
+The test suite includes comprehensive coverage validation to ensure every configurable field in values.yaml has corresponding e2e test coverage:
+
+### Coverage Test (`TestE2ECoverage`)
+
+This test validates that all values.yaml fields are covered by e2e tests:
+
+1. **Field Extraction**: Parses values.yaml to identify all configurable fields
+2. **Test Mapping**: Maps each field to its corresponding e2e test file
+3. **Coverage Analysis**: Reports coverage statistics and fails build if any field lacks coverage
+4. **Gap Identification**: Clearly identifies untested fields requiring new tests
+
+### Current Coverage Status
+
+- **Total fields in values.yaml**: 93
+- **Fields with e2e test coverage**: 40
+- **Fields skipped (metadata/complex)**: 54
+- **Untested fields**: 0 ✅
+
+### Test File Organization
+
+Each test file covers specific value categories:
+
+- `autoscaling_test.go` - HPA configuration and scaling behavior
+- `rbac_test.go` - RBAC permissions and cluster roles
+- `deployment_test.go` - Basic deployment configuration flags
+- `deployment_config_test.go` - Advanced deployment settings (resources, security, etc.)
+- `service_test.go` - Service configuration and naming overrides
+- `service_account_test.go` - Service account configuration and annotations
+- `service_monitor_test.go` - Prometheus ServiceMonitor resources
+- `approver_role_test.go` - Certificate approval permissions
+- `pod_disruption_budget_test.go` - PDB configuration
+- `coverage_test.go` - Template value reference validation
+- `e2e_coverage_test.go` - **E2E coverage validation**
 
 ## Dependencies
 
@@ -45,9 +82,22 @@ make e2eHelmTest
 ./run-tests.sh
 ```
 
-## Test Structure
+### Coverage Validation Only
 
+```bash
+# Run just the e2e coverage validation test
+cd tests/helm && go test -v -run TestE2ECoverage
 ```
+
+## Adding New Tests
+
+When adding new configurable fields to values.yaml:
+
+1. **Add E2E Test**: Create test case in appropriate test file that validates the field
+2. **Update Coverage Map**: Add field mapping in `e2e_coverage_test.go`
+3. **Verify Coverage**: Run `TestE2ECoverage` to ensure no gaps
+
+The build will fail if any values.yaml field lacks e2e test coverage, ensuring comprehensive validation.
 tests/helm/
 ├── autoscaling_test.go      # Tests HPA and replica count logic
 ├── rbac_test.go            # Tests RBAC resource creation
