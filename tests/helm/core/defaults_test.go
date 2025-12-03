@@ -66,13 +66,13 @@ func TestDefaults(t *testing.T) {
 	// Validate affinity defaults
 	affinity := deployment.Spec.Template.Spec.Affinity
 	require.NotNil(t, affinity)
-	
+
 	// Check node affinity for OS/arch requirements
 	nodeAffinity := affinity.NodeAffinity
 	require.NotNil(t, nodeAffinity)
 	assert.Contains(t, nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values, "linux")
 	assert.Contains(t, nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Values, "amd64")
-	
+
 	// Check pod anti-affinity for spreading
 	podAntiAffinity := affinity.PodAntiAffinity
 	require.NotNil(t, podAntiAffinity)

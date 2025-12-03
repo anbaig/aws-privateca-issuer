@@ -1,9 +1,10 @@
 package helm
 
 import (
-	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"context"
 	"testing"
+
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

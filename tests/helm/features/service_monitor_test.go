@@ -1,8 +1,9 @@
 package helm
 
 import (
-	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 	"testing"
+
+	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
 )
 
 func TestServiceMonitor(t *testing.T) {
