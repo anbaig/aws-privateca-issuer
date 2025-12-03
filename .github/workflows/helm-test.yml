@@ -44,7 +44,7 @@ jobs:
 
     - name: Run test cases with Kind cluster
       run: |
-        make helmE2ETestPreProd
+        make helmE2ETestLocal
 
     - name: Terminate Kind cluster
       if: always()
