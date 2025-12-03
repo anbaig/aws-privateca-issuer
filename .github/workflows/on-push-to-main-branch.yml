@@ -224,7 +224,7 @@ jobs:
           git push
 
   build-public-ecr:
-    needs: [run-for-arm-beta, run-for-x86-beta, run-helm-tests-beta, get-versions, update-chart]
+    needs: [update-chart]
     if: ${{ needs.update-chart.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
