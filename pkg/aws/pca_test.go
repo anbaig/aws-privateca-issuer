@@ -23,21 +23,23 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acmpca"
 	acmpcatypes "github.com/aws/aws-sdk-go-v2/service/acmpca/types"
+	injections "github.com/cert-manager/aws-privateca-issuer/pkg/api/injections"
 	issuerapi "github.com/cert-manager/aws-privateca-issuer/pkg/api/v1beta1"
 	cmapi "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -876,6 +878,87 @@ func TestPCASignValidity(t *testing.T) {
 
 		})
 	}
+}
+
+
+type RoundTripFunc func(req *http.Request) (*http.Response, error)
+
+func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestUserAgentMiddleware(t *testing.T) {
+	testUserAgent := "test-aws-privateca-issuer"
+	testPluginVersion := "v1.2.3"
+
+	injections.UserAgent = testUserAgent
+	injections.PlugInVersion = testPluginVersion
+
+	var capturedRequest *http.Request
+	httpClient := &http.Client{
+		Transport: RoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			capturedRequest = req
+
+			return &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(strings.NewReader(`<ErrorResponse><Error><Code>ValidationException</Code></Error></ErrorResponse>`)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, issuerapi.AddToScheme(scheme))
+	require.NoError(t, v1.AddToScheme(scheme))
+
+	objects := []client.Object{
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-credentials",
+				Namespace: "test-ns",
+			},
+			Data: map[string][]byte{
+				"AWS_ACCESS_KEY_ID":     []byte("test-key"),
+				"AWS_SECRET_ACCESS_KEY": []byte("test-secret"),
+			},
+		},
+	}
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(objects...).
+		Build()
+
+	issSpec := &issuerapi.AWSPCAIssuerSpec{
+		SecretRef: issuerapi.AWSCredentialsSecretReference{
+			SecretReference: v1.SecretReference{
+				Name:      "test-credentials",
+				Namespace: "test-ns",
+			},
+		},
+		Region: "us-east-1",
+		Arn:    "arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/test",
+	}
+
+	provisioner, err := GetProvisioner(context.TODO(), fakeClient, types.NamespacedName{Namespace: "test-ns", Name: "test-issuer"}, issSpec)
+	require.NoError(t, err)
+
+	pcaProvisioner := provisioner.(*PCAProvisioner)
+
+	_, _ = pcaProvisioner.pcaClient.DescribeCertificateAuthority(context.TODO(),
+		&acmpca.DescribeCertificateAuthorityInput{
+			CertificateAuthorityArn: aws.String(issSpec.Arn),
+		},
+		func(o *acmpca.Options) {
+			o.HTTPClient = httpClient
+		},
+	)
+
+	require.NotNil(t, capturedRequest, "Expected HTTP request to be captured")
+
+	userAgentHeader := capturedRequest.Header.Get("User-Agent")
+	expectedUserAgentPart := fmt.Sprintf("%s/%s", testUserAgent, testPluginVersion)
+
+	assert.Contains(t, userAgentHeader, expectedUserAgentPart)
 }
 
 func ptrInt(i int64) *int64 {
