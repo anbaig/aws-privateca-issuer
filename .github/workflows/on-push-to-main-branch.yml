@@ -139,7 +139,7 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "version_number=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
 
-  run-for-arm:
+  run-for-arm-beta:
     needs: version-bump
     if: ${{ needs.version-bump.outputs.bump_type != 'none' }}
     runs-on: ubuntu-latest
@@ -152,7 +152,7 @@ jobs:
     #   architecture: 'arm64'
     #   environment: 'beta'
 
-  run-for-x86:
+  run-for-x86-beta:
     needs: version-bump
     if: ${{ needs.version-bump.outputs.bump_type != 'none' }}
     runs-on: ubuntu-latest
@@ -165,7 +165,7 @@ jobs:
     #   architecture: 'x86_64'
     #   environment: 'beta'
 
-  run-helm-tests:
+  run-helm-tests-beta:
     needs: version-bump
     if: ${{ needs.version-bump.outputs.bump_type != 'none' }}
     runs-on: ubuntu-latest
@@ -176,8 +176,8 @@ jobs:
     # uses: './.github/workflows/helm-test.yml'
 
   update-chart:
-    needs: [run-for-arm, run-for-x86, run-helm-tests, get-versions]
-    if: ${{ needs.run-for-arm.result == 'success' && needs.run-for-x86.result == 'success' && needs.run-helm-tests.result == 'success' && needs.get-versions.result == 'success' }}
+    needs: [run-for-arm-beta, run-for-x86-beta, run-helm-tests-beta, get-versions]
+    if: ${{ needs.run-for-arm-beta.result == 'success' && needs.run-for-x86-beta.result == 'success' && needs.run-helm-tests-beta.result == 'success' && needs.get-versions.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -196,8 +196,8 @@ jobs:
           git push
 
   build-public-ecr:
-    needs: [run-for-arm, run-for-x86, run-helm-tests, get-versions]
-    if: ${{ needs.run-for-arm.result == 'success' && needs.run-for-x86.result == 'success' && needs.run-helm-tests.result == 'success' && needs.get-versions.result == 'success' }}
+    needs: [run-for-arm-beta, run-for-x86-beta, run-helm-tests-beta, get-versions]
+    if: ${{ needs.run-for-arm-beta.result == 'success' && needs.run-for-x86-beta.result == 'success' && needs.run-helm-tests-beta.result == 'success' && needs.get-versions.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -244,7 +244,33 @@ jobs:
         run: |
           echo "Done"
 
-  test-new-helm-chart:
+  run-for-arm-prod:
+    needs: [publish-helm-chart]
+    if: ${{ needs.publish-helm-chart.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run
+        run: |
+          echo "Done"
+    # uses: './.github/workflows/on-safe-to-test-label.yml'
+    # with:
+    #   architecture: 'arm64'
+    #   environment: 'prod'
+
+  run-for-x86-prod:
+    needs: [publish-helm-chart]
+    if: ${{ needs.publish-helm-chart.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run
+        run: |
+          echo "Done"
+    # uses: './.github/workflows/on-safe-to-test-label.yml'
+    # with:
+    #   architecture: 'x86_64'
+    #   environment: 'prod'
+
+  run-helm-tests-prod:
     needs: [publish-helm-chart]
     if: ${{ needs.publish-helm-chart.result == 'success' }}
     runs-on: ubuntu-latest
@@ -255,8 +281,8 @@ jobs:
     # uses: './.github/workflows/helm-test.yml'
 
   release:
-    needs: [test-new-helm-chart, get-versions]
-    if: ${{ needs.test-new-helm-chart.result == 'success' }}
+    needs: [run-for-arm-prod, run-for-x86-prod, run-helm-tests-prod, get-versions]
+    if: ${{ needs.run-for-arm-prod.result == 'success' && needs.run-for-x86-prod.result == 'success' && needs.run-helm-tests-prod.result == 'success'}}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
