@@ -141,7 +141,7 @@ jobs:
           echo "version_number=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
 
   version-validation-beta:
-    needs: build-beta-ecr
+    needs: [build-beta-ecr, get-versions]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -152,7 +152,7 @@ jobs:
         run: make validate-image-version STAGE=beta VERSION=${{ needs.get-versions.outputs.new_version }}
 
   version-validation-prod:
-    needs: publish-helm-chart
+    needs: [publish-helm-chart, get-versions]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
