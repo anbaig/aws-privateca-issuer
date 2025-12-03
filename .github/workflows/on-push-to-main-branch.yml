@@ -224,7 +224,7 @@ jobs:
           git push
 
   build-public-ecr:
-    needs: [update-chart]
+    needs: [get-versions, update-chart]
     if: ${{ needs.update-chart.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
