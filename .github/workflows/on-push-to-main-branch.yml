@@ -143,7 +143,6 @@ jobs:
   version-validation-beta:
     needs: build-beta-ecr
     runs-on: ubuntu-latest
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v4
@@ -154,7 +153,6 @@ jobs:
 
   version-validation-prod:
     needs: publish-helm-chart
-    runs-on: ubuntu-latest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
