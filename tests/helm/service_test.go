@@ -81,7 +81,7 @@ func TestService(t *testing.T) {
 			} else {
 				deploymentName = release.Name + "-aws-privateca-issuer"
 			}
-			
+
 			helper.waitForDeployment(deploymentName)
 
 			if !t.Failed() {

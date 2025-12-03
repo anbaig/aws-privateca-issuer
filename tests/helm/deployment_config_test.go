@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestDeploymentConfiguration(t *testing.T) {
@@ -39,7 +39,7 @@ func TestDeploymentConfiguration(t *testing.T) {
 				"podSecurityContext": map[string]interface{}{
 					"runAsUser": 1000,
 				},
-				"replicaCount": 3,
+				"replicaCount":         3,
 				"revisionHistoryLimit": 5,
 			},
 			validate: func(t *testing.T, h *testHelper, releaseName string) {

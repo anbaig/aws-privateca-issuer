@@ -48,8 +48,8 @@ func TestOptionalFields(t *testing.T) {
 		},
 		"extraContainers": []map[string]interface{}{
 			{
-				"name":  "sidecar",
-				"image": "busybox:latest",
+				"name":    "sidecar",
+				"image":   "busybox:latest",
 				"command": []string{"sleep", "3600"},
 			},
 		},

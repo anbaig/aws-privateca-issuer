@@ -33,7 +33,7 @@ func TestApproverRole(t *testing.T) {
 				// Verify ClusterRole exists for approval
 				clusterRole, err := h.clientset.RbacV1().ClusterRoles().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
 				require.NoError(t, err)
-				
+
 				// Check that the role has approval permissions
 				found := false
 				for _, rule := range clusterRole.Rules {
@@ -50,7 +50,7 @@ func TestApproverRole(t *testing.T) {
 				clusterRoleBinding, err := h.clientset.RbacV1().ClusterRoleBindings().Get(context.TODO(), clusterRoleName, metav1.GetOptions{})
 				require.NoError(t, err)
 				assert.Equal(t, clusterRoleName, clusterRoleBinding.RoleRef.Name)
-				
+
 				// Check that it binds to the correct service account
 				assert.Len(t, clusterRoleBinding.Subjects, 1)
 				assert.Equal(t, "cert-manager", clusterRoleBinding.Subjects[0].Name)

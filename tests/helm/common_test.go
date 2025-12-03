@@ -3,6 +3,7 @@ package helm
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/release"
@@ -20,9 +22,25 @@ import (
 )
 
 const (
-	chartPath     = "../../charts/aws-pca-issuer"
-	releasePrefix = "test-release"
+	localChartPath = "../../charts/aws-pca-issuer"
+	prodChartRepo  = "https://cert-manager.github.io/aws-privateca-issuer"
+	prodChartName  = "aws-privateca-issuer/aws-privateca-issuer"
+	releasePrefix  = "test-release"
 )
+
+type testMode int
+
+const (
+	PreProdMode testMode = iota
+	ProdMode
+)
+
+func getTestMode() testMode {
+	if os.Getenv("HELM_TEST_MODE") == "prod" {
+		return ProdMode
+	}
+	return PreProdMode
+}
 
 type testHelper struct {
 	t         *testing.T
@@ -132,10 +150,12 @@ func (h *testHelper) cleanupClusterResourcesForRelease(releaseName string) {
 }
 
 func (h *testHelper) installChart(values map[string]interface{}) *release.Release {
-	h.t.Logf("Starting chart installation with values: %+v", values)
+	mode := getTestMode()
+	h.t.Logf("Starting chart installation in %s mode with values: %+v",
+		map[testMode]string{PreProdMode: "pre-production", ProdMode: "production"}[mode], values)
 
 	settings := cli.New()
-	settings.KubeConfig = "/tmp/pca_kubeconfig" // Use the same kubeconfig as manual install
+	settings.KubeConfig = "/tmp/pca_kubeconfig"
 	actionConfig := new(action.Configuration)
 
 	err := actionConfig.Init(settings.RESTClientGetter(), h.namespace, "secret", func(format string, v ...interface{}) {
@@ -154,31 +174,57 @@ func (h *testHelper) installChart(values map[string]interface{}) *release.Releas
 	install.ReleaseName = releaseName
 	install.Namespace = h.namespace
 	install.CreateNamespace = true
-	install.Wait = false // Don't wait for pods to be ready
+	install.Wait = false
 	install.Timeout = 2 * time.Minute
 
-	h.t.Logf("Loading chart from path: %s", chartPath)
-	chart, err := loader.Load(chartPath)
-	if !assert.NoError(h.t, err, "Failed to load chart") {
-		return nil
+	var chart *chart.Chart
+
+	if mode == ProdMode {
+		// Production mode: Use chart from Helm registry
+		h.t.Logf("Production mode: Installing from Helm registry")
+
+		// Use Helm's built-in repository functionality
+		install.ChartPathOptions.RepoURL = prodChartRepo
+		chartPath, err := install.ChartPathOptions.LocateChart("aws-privateca-issuer", settings)
+		if err != nil {
+			h.t.Logf("Failed to locate chart from repository: %v", err)
+			return nil
+		}
+
+		chart, err = loader.Load(chartPath)
+		if !assert.NoError(h.t, err, "Failed to load chart from repository") {
+			return nil
+		}
+		h.t.Logf("Production chart loaded successfully: %s-%s", chart.Name(), chart.Metadata.Version)
+	} else {
+		// Pre-production mode: Use local chart
+		h.t.Logf("Pre-production mode: Loading chart from local path: %s", localChartPath)
+		chart, err = loader.Load(localChartPath)
+		if !assert.NoError(h.t, err, "Failed to load local chart") {
+			return nil
+		}
+		h.t.Logf("Local chart loaded successfully: %s-%s", chart.Name(), chart.Metadata.Version)
 	}
-	h.t.Logf("Chart loaded successfully: %s-%s", chart.Name(), chart.Metadata.Version)
 
 	// Set default values for testing if not provided
 	if values == nil {
 		values = make(map[string]interface{})
 	}
 
-	// Only set default image if not already specified in test values
-	if _, exists := values["image"]; !exists {
-		values["image"] = map[string]interface{}{
-			"repository": "public.ecr.aws/k1n1h4h4/cert-manager-aws-privateca-issuer",
-			"tag":        "v1.2.7",
-			"pullPolicy": "IfNotPresent",
+	// Configure image based on mode
+	if mode == PreProdMode {
+		// Pre-production: Override with local image if not specified
+		if _, exists := values["image"]; !exists {
+			values["image"] = map[string]interface{}{
+				"repository": "public.ecr.aws/k1n1h4h4/cert-manager-aws-privateca-issuer",
+				"tag":        "v1.2.7",
+				"pullPolicy": "IfNotPresent",
+			}
 		}
 	}
+	// Production mode: Use chart's default image values (no overrides)
 
-	// Only set default probe settings if not already specified
+	// Set common test defaults if not already specified
 	if _, exists := values["livenessProbe"]; !exists {
 		values["livenessProbe"] = map[string]interface{}{
 			"enabled": false,
@@ -189,8 +235,6 @@ func (h *testHelper) installChart(values map[string]interface{}) *release.Releas
 			"enabled": false,
 		}
 	}
-
-	// Only set default approver role if not already specified
 	if _, exists := values["approverRole"]; !exists {
 		values["approverRole"] = map[string]interface{}{
 			"enabled": false,
@@ -205,15 +249,8 @@ func (h *testHelper) installChart(values map[string]interface{}) *release.Releas
 		return nil
 	}
 
-	// Debug: Show what Helm thinks it created
 	h.t.Logf("Helm release %s installed successfully", release.Name)
 	h.t.Logf("Release manifest length: %d", len(release.Manifest))
-	h.t.Logf("Release info: %+v", release.Info)
-
-	// Show the actual manifest (complete)
-	if len(release.Manifest) > 0 {
-		h.t.Logf("Complete Helm manifest:\n%s", release.Manifest)
-	}
 
 	time.Sleep(2 * time.Second) // Give time for resources to be created
 

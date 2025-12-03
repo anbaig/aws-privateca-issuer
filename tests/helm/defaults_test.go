@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestDefaults(t *testing.T) {
@@ -65,13 +65,13 @@ func TestDefaults(t *testing.T) {
 	// Validate affinity defaults
 	affinity := deployment.Spec.Template.Spec.Affinity
 	require.NotNil(t, affinity)
-	
+
 	// Check node affinity for OS/arch requirements
 	nodeAffinity := affinity.NodeAffinity
 	require.NotNil(t, nodeAffinity)
 	assert.Contains(t, nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values, "linux")
 	assert.Contains(t, nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Values, "amd64")
-	
+
 	// Check pod anti-affinity for spreading
 	podAntiAffinity := affinity.PodAntiAffinity
 	require.NotNil(t, podAntiAffinity)
