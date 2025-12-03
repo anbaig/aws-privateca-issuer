@@ -141,8 +141,8 @@ jobs:
           echo "version_number=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
 
   version-validation-beta:
-    needs: [run-for-arm-beta, run-for-x86-beta, run-helm-tests-beta]
-    if: ${{ needs.run-for-arm-beta.result == 'success' && needs.run-for-x86-beta.result == 'success' && needs.run-helm-tests-beta.result == 'success' }}
+    needs: build-beta-ecr
+    runs-on: ubuntu-latest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -153,8 +153,8 @@ jobs:
         run: make validate-image-version STAGE=beta VERSION=${{ needs.get-versions.outputs.new_version }}
 
   version-validation-prod:
-    needs: [run-for-arm-prod, run-for-x86-prod, run-helm-tests-prod]
-    if: ${{ needs.run-for-arm-prod.result == 'success' && needs.run-for-x86-prod.result == 'success' && needs.run-helm-tests-prod.result == 'success' }}
+    needs: publish-helm-chart
+    runs-on: ubuntu-latest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -223,8 +223,8 @@ jobs:
       run: make kind-cluster-delete
 
   update-chart:
-    needs: [version-validation-beta, get-versions]
-    if: ${{ needs.version-validation-beta.result == 'success' && needs.get-versions.result == 'success' }}
+    needs: [run-for-arm-beta, run-for-x86-beta, run-helm-tests-beta, version-validation-beta, get-versions]
+    if: ${{ needs.run-for-arm-beta.result == 'success' && needs.run-for-x86-beta.result == 'success' && needs.run-helm-tests-beta.result == 'success' && needs.version-validation-beta.result == 'success' && needs.get-versions.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -356,8 +356,8 @@ jobs:
       run: make kind-cluster-delete
 
   release:
-    needs: version-validation-prod
-    if: ${{ needs.version-validation-prod.result == 'success' }}
+    needs: [run-for-arm-prod, run-for-x86-prod, run-helm-tests-prod, version-validation-prod, get-versions]
+    if: ${{ needs.run-for-arm-prod.result == 'success' && needs.run-for-x86-prod.result == 'success' && needs.run-helm-tests-prod.result == 'success' && needs.version-validation-prod.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
