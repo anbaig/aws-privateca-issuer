@@ -1,6 +1,6 @@
 # The version which will be reported by the --version argument of each binary
 # and which will be used as the Docker image tag
-VERSION := $(shell git remote add mainRepo https://github.com/cert-manager/aws-privateca-issuer.git 2>/dev/null || true && git fetch mainRepo --tags 2>/dev/null && (git describe --tags 2>/dev/null || git describe --tags --always 2>/dev/null || echo "v0.0.0-unknown") | awk -F"-" '{print $$1}' && git remote remove mainRepo 2>/dev/null || true)
+VERSION := $(shell grep '^version:' charts/aws-pca-issuer/Chart.yaml | awk '{print $$2}' | tr -d '"')
 
 # ECR repository for test images (can be overridden in CI)
 PRIVATE_REGISTRY ?= public.ecr.aws/c9o0b7e4
