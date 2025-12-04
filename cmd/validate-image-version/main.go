@@ -62,13 +62,17 @@ func extractEmbeddedVersion(image string) string {
 	if err := cmd.Run(); err != nil {
 		return "unknown"
 	}
-	defer exec.Command("docker", "rm", "temp-version").Run()
+	defer func() {
+		_ = exec.Command("docker", "rm", "temp-version").Run()
+	}()
 
 	cmd = exec.Command("docker", "cp", "temp-version:/manager", "/tmp/manager")
 	if err := cmd.Run(); err != nil {
 		return "unknown"
 	}
-	defer os.Remove("/tmp/manager")
+	defer func() {
+		_ = os.Remove("/tmp/manager")
+	}()
 
 	cmd = exec.Command("strings", "/tmp/manager")
 	output, err := cmd.Output()
