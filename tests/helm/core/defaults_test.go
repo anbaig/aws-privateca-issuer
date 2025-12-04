@@ -2,6 +2,8 @@ package helm
 
 import (
 	"context"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/cert-manager/aws-privateca-issuer/tests/helm/testutil"
@@ -40,10 +42,15 @@ func TestDefaults(t *testing.T) {
 	container := deployment.Spec.Template.Spec.Containers[0]
 	mode := testutil.GetTestMode()
 	if mode == testutil.BetaMode {
-		assert.Contains(t, container.Image, "public.ecr.aws/cert-manager-aws-privateca-issuer/cert-manager-aws-privateca-issuer-test")
+		privateRegistry := os.Getenv("PRIVATE_REGISTRY")
+		require.NotEmpty(t, privateRegistry, "PRIVATE_REGISTRY environment variable is required for beta mode")
+		repoName := os.Getenv("GITHUB_REPOSITORY")
+		require.NotEmpty(t, repoName, "GITHUB_REPOSITORY environment variable is required for beta mode")
+		expectedRepo := privateRegistry + "/" + strings.ToLower(strings.ReplaceAll(repoName, "/", "-")) + "-test"
+		assert.Contains(t, container.Image, expectedRepo)
 		assert.Equal(t, "Always", string(container.ImagePullPolicy))
 	} else {
-		assert.Contains(t, container.Image, "public.ecr.aws/k1n1h4h4/cert-manager-aws-privateca-issuer")
+		assert.Contains(t, container.Image, "localhost:5000/aws-privateca-issuer")
 		assert.Equal(t, "IfNotPresent", string(container.ImagePullPolicy))
 	}
 

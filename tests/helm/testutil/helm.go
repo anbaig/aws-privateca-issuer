@@ -3,6 +3,8 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -83,19 +85,28 @@ func (h *TestHelper) InstallChart(values map[string]interface{}) *release.Releas
 
 	// Configure image based on mode
 	if mode == LocalMode {
-		// Local mode: Override with local ECR image if not specified
+		// Local mode: Use localhost registry
 		if _, exists := values["image"]; !exists {
 			values["image"] = map[string]interface{}{
-				"repository": "public.ecr.aws/k1n1h4h4/cert-manager-aws-privateca-issuer",
-				"tag":        "v1.2.7",
+				"repository": "localhost:5000/aws-privateca-issuer",
+				"tag":        "latest",
 				"pullPolicy": "IfNotPresent",
 			}
 		}
 	} else if mode == BetaMode {
-		// Beta mode: Override with testECR image if not specified
+		// Beta mode: Use PRIVATE_REGISTRY or fail
 		if _, exists := values["image"]; !exists {
+			privateRegistry := os.Getenv("PRIVATE_REGISTRY")
+			if privateRegistry == "" {
+				h.T.Fatal("PRIVATE_REGISTRY environment variable is required for beta mode")
+			}
+			repoName := os.Getenv("GITHUB_REPOSITORY")
+			if repoName == "" {
+				h.T.Fatal("GITHUB_REPOSITORY environment variable is required for beta mode")
+			}
+			betaRepo := privateRegistry + "/" + strings.ToLower(strings.ReplaceAll(repoName, "/", "-")) + "-test"
 			values["image"] = map[string]interface{}{
-				"repository": "public.ecr.aws/cert-manager-aws-privateca-issuer/cert-manager-aws-privateca-issuer-test",
+				"repository": betaRepo,
 				"tag":        "latest",
 				"pullPolicy": "Always",
 			}

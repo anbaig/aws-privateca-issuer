@@ -2,6 +2,9 @@
 # and which will be used as the Docker image tag
 VERSION := $(shell git remote add mainRepo https://github.com/cert-manager/aws-privateca-issuer.git && git fetch mainRepo --tags && git describe --tags | awk -F"-" '{print $$1}' && git remote remove mainRepo)
 
+# ECR repository for test images (can be overridden in CI)
+PRIVATE_REGISTRY ?= public.ecr.aws/c9o0b7e4
+
 # Default bundle image tag
 BUNDLE_IMG ?= controller-bundle:$(VERSION)
 

@@ -5,8 +5,8 @@ on:
     branches: [ main ]
 
 env:
-  TEST_ECR_REPO: public.ecr.aws/c9o0b7e4
-  PROD_ECR_REPO: public.ecr.aws/c9o0b7e4
+  PRIVATE_REGISTRY: public.ecr.aws/c9o0b7e4
+  PUBLIC_REGISTRY: public.ecr.aws/c9o0b7e4
   ECR_USER_AGENT: aws-privateca-issuer
 
 jobs:
@@ -38,7 +38,7 @@ jobs:
     - name: Setup Push to ECR
       run: |
         export PLUGIN_VERSION=$(git describe --tags)
-        export TAG_BASE=${{ env.TEST_ECR_REPO }}/$(echo ${GITHUB_REPOSITORY,,} | sed s#/#-#)-test
+        export TAG_BASE=${{ env.PRIVATE_REGISTRY }}/$(echo ${GITHUB_REPOSITORY,,} | sed s#/#-#)-test
         echo TAG_BASE=$TAG_BASE >> $GITHUB_ENV
         echo PLUGIN_VERSION=$PLUGIN_VERSION >> $GITHUB_ENV
     - name: Build and push container images
@@ -189,6 +189,8 @@ jobs:
   run-helm-tests-beta:
     needs: build-beta-ecr
     runs-on: ubuntu-latest
+    env:
+      PRIVATE_REGISTRY: ${{ env.PRIVATE_REGISTRY }}
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -268,7 +270,7 @@ jobs:
           AWS_REGION: us-east-1
       - name: Setup Push to Public ECR
         run: |
-          export TAG_BASE=${{ env.PROD_ECR_REPO }}/$(echo ${GITHUB_REPOSITORY,,} | sed s#/#-#)
+          export TAG_BASE=${{ env.PUBLIC_REGISTRY }}/$(echo ${GITHUB_REPOSITORY,,} | sed s#/#-#)
           echo TAG_BASE=$TAG_BASE >> $GITHUB_ENV
       - name: Build and push container images
         uses: docker/build-push-action@v6

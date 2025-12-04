@@ -2,6 +2,24 @@
 
 This directory contains end-to-end tests for the AWS Private CA Issuer Helm chart that deploy to a real Kind cluster and validate actual Kubernetes resources.
 
+## Configuration
+
+The test framework uses the same registry environment variables as the CI/CD workflows for consistency:
+
+### ECR Repository Configuration
+
+- `PRIVATE_REGISTRY`: Beta/test ECR registry (default: `public.ecr.aws/c9o0b7e4`)
+- `PUBLIC_REGISTRY`: Production ECR registry (default: `public.ecr.aws/c9o0b7e4`)
+- `LOCAL_ECR_REPO`: Local development ECR repository (default: `public.ecr.aws/k1n1h4h4/cert-manager-aws-privateca-issuer`)
+- `LOCAL_ECR_TAG`: Image tag for local testing (default: `v1.2.7`)
+- `BETA_ECR_TAG`: Image tag for beta testing (default: `latest`)
+
+### Test Modes
+
+- `HELM_TEST_MODE=local`: Uses local chart with local ECR image
+- `HELM_TEST_MODE=beta`: Uses local chart with private registry image  
+- `HELM_TEST_MODE=prod`: Uses production chart with default image values
+
 ## Directory Structure
 
 ```
