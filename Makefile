@@ -368,4 +368,4 @@ ${KIND}: ${BIN}
 
 .PHONY: validate-image-version
 validate-image-version: ## Validate version tags in container images by stage
-	@go run validate-image-version.go $(STAGE) $(VERSION)
+	@go run cmd/validate-image-version/main.go $(STAGE) $(VERSION)
