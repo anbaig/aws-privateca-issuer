@@ -2,7 +2,6 @@ package helm
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
@@ -42,10 +41,7 @@ func TestDefaults(t *testing.T) {
 	container := deployment.Spec.Template.Spec.Containers[0]
 	mode := testutil.GetTestMode()
 	if mode == testutil.BetaMode {
-		registry := os.Getenv("BETA_REGISTRY")
-		require.NotEmpty(t, registry, "BETA_REGISTRY environment variable is required")
-		repoName := os.Getenv("GITHUB_REPOSITORY")
-		require.NotEmpty(t, repoName, "GITHUB_REPOSITORY environment variable is required")
+		registry, repoName := testutil.GetBetaDefaults()
 
 		expectedRepo := registry + "/" + strings.ToLower(strings.ReplaceAll(repoName, "/", "-")) + "-test"
 		assert.Contains(t, container.Image, expectedRepo)

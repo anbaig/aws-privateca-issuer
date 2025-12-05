@@ -16,6 +16,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// GetBetaDefaults returns the default registry and repository for beta mode
+// NOTE: For dev environments, change these defaults to point to your ECR registry
+func GetBetaDefaults() (registry, repository string) {
+	registry = os.Getenv("BETA_REGISTRY")
+	if registry == "" {
+		registry = "public.ecr.aws/cert-manager-aws-privateca-issuer" // Default for main repository (not forked)
+	}
+
+	repoName := os.Getenv("GITHUB_REPOSITORY")
+	if repoName == "" {
+		repoName = "cert-manager/aws-privateca-issuer" // Default for main repository (not forked)
+	}
+
+	return registry, repoName
+}
+
 func (h *TestHelper) InstallChart(values map[string]interface{}) *release.Release {
 	mode := GetTestMode()
 	modeNames := map[TestMode]string{
@@ -94,16 +110,9 @@ func (h *TestHelper) InstallChart(values map[string]interface{}) *release.Releas
 			}
 		}
 	} else if mode == BetaMode {
-		// Beta mode: Use BETA_REGISTRY or fail
+		// Beta mode: Use BETA_REGISTRY and GITHUB_REPOSITORY
 		if _, exists := values["image"]; !exists {
-			privateRegistry := os.Getenv("BETA_REGISTRY")
-			if privateRegistry == "" {
-				h.T.Fatal("BETA_REGISTRY environment variable is required for beta mode")
-			}
-			repoName := os.Getenv("GITHUB_REPOSITORY")
-			if repoName == "" {
-				h.T.Fatal("GITHUB_REPOSITORY environment variable is required for beta mode")
-			}
+			privateRegistry, repoName := GetBetaDefaults()
 			betaRepo := privateRegistry + "/" + strings.ToLower(strings.ReplaceAll(repoName, "/", "-")) + "-test"
 			values["image"] = map[string]interface{}{
 				"repository": betaRepo,
