@@ -76,8 +76,28 @@ e2etest: test
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test -v ./e2e/... -coverprofile cover.out
 
-helm-test: manager kind-cluster
-	$$SHELL e2e/helm_test.sh
+helm-test: manager kind-cluster deploy-cert-manager
+	@if [ -d "tests/helm" ]; then \
+		cd tests/helm && go mod tidy && go test -v ./core/... ./features/... . -timeout=15m; \
+	else \
+		echo "Helm tests not available - tests/helm directory not found"; \
+		echo "Skipping helm tests"; \
+	fi
+
+deploy-prometheus-crds:
+	kubectl apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.68.0/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml --kubeconfig=/tmp/pca_kubeconfig
+
+e2eHelmTest: manager create-local-registry kind-cluster deploy-cert-manager deploy-prometheus-crds
+	cd tests/helm && go mod tidy && go test -v ./core/... ./features/... . -timeout=15m
+
+helmE2ETestLocal: manager create-local-registry kind-cluster deploy-prometheus-crds
+	cd tests/helm && HELM_TEST_MODE=local go test -v ./core/... ./features/... . -timeout=15m
+
+helmE2ETestBeta: manager kind-cluster deploy-prometheus-crds
+	cd tests/helm && HELM_TEST_MODE=beta go test -v ./core/... ./features/... . -timeout=15m
+
+helmE2ETestProd: manager kind-cluster deploy-prometheus-crds
+	cd tests/helm && HELM_TEST_MODE=prod go test -v ./core/... ./features/... . -timeout=15m
 
 blog-test:
 	$$SHELL e2e/blog_test.sh
